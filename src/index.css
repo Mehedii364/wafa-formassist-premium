@@ -1,0 +1,86 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-display: "Plus Jakarta Sans", "Hind Siliguri", system-ui, -apple-system, sans-serif;
+    --font-sans: "DM Sans", "Hind Siliguri", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --wafa-bg: #F6F8F7;
+    --wafa-surface: #FFFFFF;
+    --wafa-elevated: #EEF3F0;
+    --wafa-border: #D7E2DC;
+    --wafa-text: #0F1714;
+    --wafa-muted: #4F635A;
+    --wafa-primary: #059669;
+    --wafa-primary-hover: #047857;
+    --wafa-gold: #B48A1E;
+  }
+
+  .dark {
+    --wafa-bg: #0B0F0E;
+    --wafa-surface: #121A17;
+    --wafa-elevated: #18231E;
+    --wafa-border: #26362F;
+    --wafa-text: #F4F7F5;
+    --wafa-muted: #9CAAA2;
+    --wafa-primary: #10B981;
+    --wafa-primary-hover: #059669;
+    --wafa-gold: #D4AF37;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--wafa-bg);
+    color: var(--wafa-text);
+  }
+
+  h1, h2, h3, h4, .font-display {
+    font-family: var(--font-display);
+    text-wrap: balance;
+  }
+
+  .font-mono,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  .dark body {
+    letter-spacing: 0.005em;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--wafa-primary);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Custom subtle scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 170, 162, 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(16, 185, 129, 0.45);
+}

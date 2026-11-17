@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WAFA FormAssist — Extension Settings &amp; Vault</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div>
+          <h1>WAFA FormAssist Extension Settings</h1>
+          <p class="muted">
+            Import an AES-GCM encrypted backup exported from your Management Dashboard so the extension works 100% offline independently.
+          </p>
+        </div>
+      </header>
+
+      <section class="card">
+        <h2>Import Dashboard Vault Backup (.wafa.json)</h2>
+        <div class="field">
+          <label for="backup-file">Backup File</label>
+          <input id="backup-file" type="file" accept=".json" />
+        </div>
+        <div class="field">
+          <label for="backup-passphrase">Decryption Passphrase (if encrypted)</label>
+          <input id="backup-passphrase" type="password" placeholder="Enter your backup passphrase" />
+        </div>
+        <button id="btn-import" class="btn-primary" type="button">Decrypt &amp; Import into Extension Vault</button>
+        <p id="import-status" class="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Preferences &amp; Permissions</h2>
+        <div class="field">
+          <label for="dashboard-url">Management Dashboard URL</label>
+          <input id="dashboard-url" type="url" placeholder="http://localhost:3000" />
+        </div>
+        <label class="checkbox-row">
+          <input id="chk-dgbpo" type="checkbox" checked />
+          <span>Allow verified DGBPO 2026 domain (dgbpo.teletalk.com.bd)</span>
+        </label>
+        <label class="checkbox-row">
+          <input id="chk-medium" type="checkbox" />
+          <span>Pre-select medium-confidence fields for review (Low is always blocked)</span>
+        </label>
+        <div class="row-actions">
+          <button id="btn-save-settings" class="btn-primary" type="button">Save Settings</button>
+          <button id="btn-clear-vault" class="btn-danger" type="button">Erase Extension Local Data</button>
+        </div>
+        <p id="settings-status" class="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>Local Extension Vault Status</h2>
+        <p id="vault-summary" class="mono">Loading...</p>
+      </section>
+    </div>
+
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

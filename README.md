@@ -1,11 +1,56 @@
-<div align="center">
+# WAFA FormAssist Premium
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+**Smart Application Management** — Offline-first, bilingual (English & বাংলা) government job application management workspace with an independent Chrome & Microsoft Edge Manifest V3 browser extension and optional zero-knowledge encrypted cloud sync.
 
-  <h1>Built with AI Studio</h2>
+> Developed by **Mehedi364 (Md. Mehedi Hasan)**
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+---
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Core Architecture
 
-</div>
+1. **Offline-First Management Dashboard (`/src`)**:
+   - React + TypeScript + Tailwind CSS v4 + Vite + Workbox PWA Service Worker.
+   - Local structured persistence via **IndexedDB** (`wafa_formassist_db`) with optional **AES-GCM-256 + PBKDF2-SHA256 (310,000 iterations)** at-rest encryption and auto-lock.
+   - 14 complete screens: Overview, Personal Profiles, Address Manager, Education Manager, Employment Manager, Autofill Center (with Form Review Preview & deterministic Simulated DGBPO 2026 Checker `[চেকার]` sandbox), Validation Center, Website Manager, Application History, Hybrid Sync Center, Backup & Restore, Security Center, Settings, and Help & Docs.
+   - Zero hardcoded personal demo records; all dashboard statistics are computed directly from your local vault.
+2. **Independent Chrome & Microsoft Edge Manifest V3 Extension (`/extension`)**:
+   - Standalone source tree with `manifest.json`, background service worker, validated message router, content script form scanner & autofill runner, popup UI, options/encrypted backup importer, and the DGBPO 2026 adapter.
+   - Strictly scoped to `https://dgbpo.teletalk.com.bd/*` (no `<all_urls>`).
+   - Works 100% independently offline once your encrypted `.wafa.json` backup is imported into the extension Options page.
+   - Exportable as a reproducible ZIP via `npm run build:extension` or `/api/v1/extension/download`.
+3. **Optional Modular Cloud Backend (`/backend` + `/server.ts`)**:
+   - Mounted on `/api/v1/*` for optional accounts, client-side encrypted vault sync, optimistic version conflict detection (`409 Conflict`), encrypted cloud backups, adapter registry updates, Bangladesh 64-district reference datasets, and software update checks.
+   - Strictly rejects unencrypted sync/backup payloads (`400 CLIENT_ENCRYPTION_REQUIRED`).
+   - Includes production PostgreSQL migration DDL in `/backend/migrations/001_initial_schema.sql`.
+
+---
+
+## Honest Scope & Verification Boundaries
+
+- **AI Studio Preview vs. Live Browser Extension**: The AI Studio preview runs the web Management Dashboard and the local Simulated DGBPO 2026 Checker sandbox (`/public/fixtures/dgbpo2026-simulated.html`). Chrome/Edge Manifest V3 extensions cannot execute inside a web iframe; install the packaged `/extension` directory via `chrome://extensions` or `edge://extensions` to use on live external tabs.
+- **DGBPO 2026 Live Portal DOM**: Live selectors on `https://dgbpo.teletalk.com.bd/dgbpo2026/application.php` are marked `SIMULATED_VERIFIED` / *Live Unverified* until directly inspected on the live recruitment portal inside Chrome/Edge.
+- **Strict Safety Guarantees**: WAFA FormAssist **never** auto-submits applications, **never** fills CAPTCHA, OTP, passwords, or file uploads, and **never** fabricates missing personal/education/employment information.
+
+---
+
+## Scripts
+
+```bash
+npm run dev              # Start Express API + Vite dev server on port 3000
+npm test                 # Run unit & integration tests (node:test via tsx)
+npm run build            # Build production dashboard + package extension ZIP
+npm run build:extension  # Package /extension into dist/wafa-formassist-extension-mv3-v1.0.0.zip
+npm run lint             # Run TypeScript type check (tsc --noEmit)
+```
+
+---
+
+## Documentation
+
+- [Architecture Overview](docs/architecture.md)
+- [Extension & Dashboard Installation Guide](docs/installation.md)
+- [User Guide (English)](docs/user-guide-en.md)
+- [ব্যবহার নির্দেশিকা (বাংলা)](docs/user-guide-bn.md)
+- [Security Policy](SECURITY.md) & [Detailed Security Architecture](docs/security.md)
+- [Privacy Policy](PRIVACY.md) & [Detailed Privacy Boundaries](docs/privacy.md)
+- [Changelog](CHANGELOG.md)

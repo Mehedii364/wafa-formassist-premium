@@ -1,0 +1,8 @@
+{
+  "name": "WAFA FormAssist Premium",
+  "description": "Offline-first intelligent government job application management dashboard and Manifest V3 browser extension ecosystem with local AES-GCM encryption, bilingual EN/BN localization, DGBPO 2026 adapter, and optional encrypted cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

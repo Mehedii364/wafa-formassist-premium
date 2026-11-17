@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "WAFA FormAssist Premium",
+  "short_name": "WAFA Assist",
+  "version": "1.0.0",
+  "description": "Offline-first intelligent government job application assistant for Bangladesh Teletalk portals (DGBPO 2026) with local AES-GCM encryption and user-confirmed autofill.",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "action": {
+    "default_title": "WAFA FormAssist Premium",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
+  },
+  "options_page": "options/options.html",
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://dgbpo.teletalk.com.bd/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://dgbpo.teletalk.com.bd/dgbpo2026/application.php*"
+      ],
+      "js": [
+        "content/form-scanner.js",
+        "content/autofill-runner.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

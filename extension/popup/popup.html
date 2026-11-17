@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WAFA FormAssist Premium</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <img src="../assets/icon-48.png" alt="WAFA FormAssist" width="24" height="24" />
+        <div>
+          <h1>WAFA FormAssist</h1>
+          <p class="subtitle">Smart Application Management</p>
+        </div>
+      </div>
+      <span id="offline-indicator" class="meta-text">Local Vault</span>
+    </header>
+
+    <main class="content">
+      <section class="panel">
+        <div class="row-between">
+          <span class="label">Active Website</span>
+          <span id="site-status" class="status-text">Checking...</span>
+        </div>
+        <div id="site-domain" class="mono-value">—</div>
+        <p id="site-reason" class="muted"></p>
+      </section>
+
+      <section class="panel">
+        <div class="row-between">
+          <label for="profile-select" class="label">Current Profile</label>
+          <span id="completion-text" class="mono-value">0%</span>
+        </div>
+        <select id="profile-select" class="select-control"></select>
+        <div class="progress-track">
+          <div id="completion-bar" class="progress-fill" style="width: 0%"></div>
+        </div>
+        <div id="validation-summary" class="muted"></div>
+      </section>
+
+      <section class="actions">
+        <button id="btn-scan" class="btn-primary" type="button">Scan Form</button>
+        <button id="btn-preview" class="btn-secondary" type="button" disabled>Preview Autofill</button>
+        <button id="btn-apply" class="btn-emerald" type="button" disabled>Start Autofill</button>
+      </section>
+
+      <section id="preview-panel" class="panel hidden">
+        <div class="row-between">
+          <span class="label">Approved Field Preview</span>
+          <span id="preview-counts" class="mono-value">0 ready</span>
+        </div>
+        <div id="preview-list" class="preview-list"></div>
+      </section>
+
+      <section id="report-panel" class="panel hidden">
+        <div class="label">Verification Report</div>
+        <div id="report-summary" class="mono-value"></div>
+      </section>
+
+      <div id="error-banner" class="error-banner hidden"></div>
+    </main>
+
+    <footer class="footer">
+      <button id="btn-dashboard" class="link-btn" type="button">Open Dashboard</button>
+      <button id="btn-settings" class="link-btn" type="button">Settings &amp; Vault</button>
+    </footer>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

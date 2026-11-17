@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bangladesh Post Office (DGBPO 2026) — Checker [চেকার] Simulated Form Fixture</title>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 960px; margin: 24px auto; padding: 0 16px; background: #f8faf9; color: #0f1714; }
+      header { border-bottom: 2px solid #059669; padding-bottom: 12px; margin-bottom: 20px; }
+      .notice { background: #ecfdf5; border: 1px solid #a7f3d0; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 18px; }
+      fieldset { border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; margin-bottom: 18px; background: #fff; }
+      legend { font-weight: 700; padding: 0 8px; color: #065f46; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+      label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500; }
+      input, select, textarea { padding: 7px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 13px; }
+      .inline-check { flex-direction: row; align-items: center; gap: 8px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Bangladesh Post Office — Department of Posts (DGBPO 2026)</h1>
+      <p>Post Name: <strong>Checker [চেকার]</strong> · Deterministic Local Testing Fixture</p>
+    </header>
+    <div class="notice">
+      Simulated local application form fixture for deterministic WAFA FormAssist testing. Does not transmit data over the internet.
+    </div>
+
+    <form id="dgbpo2026-form" onsubmit="event.preventDefault();">
+      <fieldset data-wafa-section="basic">
+        <legend>Basic Information / মৌলিক তথ্য</legend>
+        <div class="grid">
+          <label for="applicant_name">Applicant's Name *<input id="applicant_name" name="applicant_name" type="text" required /></label>
+          <label for="applicant_name_bn">Applicant's Name (Bengali) / আবেদনকারীর নাম (বাংলায়) *<input id="applicant_name_bn" name="applicant_name_bn" type="text" required /></label>
+          <label for="father_name">Father's Name *<input id="father_name" name="father_name" type="text" required /></label>
+          <label for="father_name_bn">Father's Name (Bengali) / পিতার নাম (বাংলায়)<input id="father_name_bn" name="father_name_bn" type="text" /></label>
+          <label for="mother_name">Mother's Name *<input id="mother_name" name="mother_name" type="text" required /></label>
+          <label for="mother_name_bn">Mother's Name (Bengali) / মাতার নাম (বাংলায়)<input id="mother_name_bn" name="mother_name_bn" type="text" /></label>
+          <label for="dob">Date of Birth (DD/MM/YYYY) *<input id="dob" name="dob" type="text" placeholder="DD/MM/YYYY" required /></label>
+          <label for="nationality">Nationality *<select id="nationality" name="nationality" required><option value="">Select One</option><option value="Bangladeshi">Bangladeshi</option></select></label>
+          <label for="religion">Religion *<select id="religion" name="religion" required><option value="">Select One</option><option value="Islam">Islam</option><option value="Hinduism">Hinduism</option><option value="Christianity">Christianity</option><option value="Buddhism">Buddhism</option><option value="Others">Others</option></select></label>
+          <label for="gender">Gender *<select id="gender" name="gender" required><option value="">Select One</option><option value="Male">Male</option><option value="Female">Female</option><option value="Third Gender">Third Gender</option></select></label>
+          <label for="national_id">National ID<input id="national_id" name="national_id" type="text" /></label>
+          <label for="birth_registration">Birth Registration<input id="birth_registration" name="birth_registration" type="text" /></label>
+          <label for="passport_id">Passport ID<input id="passport_id" name="passport_id" type="text" /></label>
+          <label for="marital_status">Marital Status *<select id="marital_status" name="marital_status" required><option value="">Select One</option><option value="Single">Single</option><option value="Married">Married</option></select></label>
+          <label for="mobile_number">Mobile Number *<input id="mobile_number" name="mobile_number" type="tel" required /></label>
+          <label for="confirm_mobile_number">Confirm Mobile Number *<input id="confirm_mobile_number" name="confirm_mobile_number" type="tel" required /></label>
+          <label for="email">Email<input id="email" name="email" type="email" /></label>
+          <label for="quota">Quota *<select id="quota" name="quota" required><option value="">Select One</option><option value="Non Quota">Non Quota</option><option value="Freedom Fighter">Freedom Fighter</option><option value="Physically Handicapped">Physically Handicapped</option><option value="Orphan">Orphan</option><option value="Ethnic Minority">Ethnic Minority</option><option value="Ansar-VDP">Ansar-VDP</option></select></label>
+          <label for="departmental_status">Departmental Status<select id="departmental_status" name="departmental_status"><option value="">Select One</option><option value="None">None</option><option value="Govt. Employee">Govt. Employee</option><option value="Semi Govt. Employee">Semi Govt. Employee</option><option value="Autonomous">Autonomous</option><option value="Departmental Candidate">Departmental Candidate</option></select></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="present_address">
+        <legend>Present Address / বর্তমান ঠিকানা</legend>
+        <div class="grid">
+          <label for="present_careof">Care Of<input id="present_careof" name="present_careof" type="text" /></label>
+          <label for="present_village">Village / Road / House / Flat<input id="present_village" name="present_village" type="text" /></label>
+          <label for="present_district">District<select id="present_district" name="present_district"><option value="">Select District</option><option value="Dhaka">Dhaka</option><option value="Chattogram">Chattogram</option><option value="Rajshahi">Rajshahi</option><option value="Khulna">Khulna</option><option value="Sylhet">Sylhet</option><option value="Barishal">Barishal</option><option value="Rangpur">Rangpur</option><option value="Mymensingh">Mymensingh</option><option value="Cumilla">Cumilla</option><option value="Gazipur">Gazipur</option></select></label>
+          <label for="present_upazila">Upazila / Police Station<input id="present_upazila" name="present_upazila" type="text" /></label>
+          <label for="present_post">Post Office<input id="present_post" name="present_post" type="text" /></label>
+          <label for="present_postcode">Post Code<input id="present_postcode" name="present_postcode" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="permanent_address">
+        <legend>Permanent Address / স্থায়ী ঠিকানা</legend>
+        <label class="inline-check" for="same_as_present"><input id="same_as_present" name="same_as_present" type="checkbox" /> Same as Present Address</label>
+        <div class="grid" style="margin-top: 10px;">
+          <label for="permanent_careof">Care Of<input id="permanent_careof" name="permanent_careof" type="text" /></label>
+          <label for="permanent_village">Village / Road / House / Flat<input id="permanent_village" name="permanent_village" type="text" /></label>
+          <label for="permanent_district">District<select id="permanent_district" name="permanent_district"><option value="">Select District</option><option value="Dhaka">Dhaka</option><option value="Chattogram">Chattogram</option><option value="Rajshahi">Rajshahi</option><option value="Khulna">Khulna</option><option value="Sylhet">Sylhet</option><option value="Barishal">Barishal</option><option value="Rangpur">Rangpur</option><option value="Mymensingh">Mymensingh</option><option value="Cumilla">Cumilla</option><option value="Gazipur">Gazipur</option></select></label>
+          <label for="permanent_upazila">Upazila / Police Station<input id="permanent_upazila" name="permanent_upazila" type="text" /></label>
+          <label for="permanent_post">Post Office<input id="permanent_post" name="permanent_post" type="text" /></label>
+          <label for="permanent_postcode">Post Code<input id="permanent_postcode" name="permanent_postcode" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="ssc">
+        <legend>SSC / Equivalent</legend>
+        <div class="grid">
+          <label for="ssc_exam">Examination<select id="ssc_exam" name="ssc_exam"><option value="">Select</option><option value="SSC">SSC</option><option value="Dakhil">Dakhil</option><option value="SSC Vocational">SSC Vocational</option></select></label>
+          <label for="ssc_roll">Roll Number<input id="ssc_roll" name="ssc_roll" type="text" /></label>
+          <label for="ssc_group">Group / Subject<select id="ssc_group" name="ssc_group"><option value="">Select</option><option value="Science">Science</option><option value="Business Studies">Business Studies</option><option value="Humanities">Humanities</option><option value="General">General</option></select></label>
+          <label for="ssc_board">Board<select id="ssc_board" name="ssc_board"><option value="">Select</option><option value="Dhaka">Dhaka</option><option value="Chattogram">Chattogram</option><option value="Rajshahi">Rajshahi</option><option value="Comilla">Comilla</option><option value="Jessore">Jessore</option><option value="Sylhet">Sylhet</option><option value="Dinajpur">Dinajpur</option><option value="Barishal">Barishal</option><option value="Mymensingh">Mymensingh</option><option value="Madrasah">Madrasah</option><option value="Technical">Technical</option></select></label>
+          <label for="ssc_result">Result<input id="ssc_result" name="ssc_result" type="text" /></label>
+          <label for="ssc_year">Passing Year<input id="ssc_year" name="ssc_year" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="hsc">
+        <legend>HSC / Equivalent</legend>
+        <div class="grid">
+          <label for="hsc_exam">Examination<select id="hsc_exam" name="hsc_exam"><option value="">Select</option><option value="HSC">HSC</option><option value="Alim">Alim</option><option value="HSC Vocational">HSC Vocational</option><option value="Diploma">Diploma</option></select></label>
+          <label for="hsc_roll">Roll Number<input id="hsc_roll" name="hsc_roll" type="text" /></label>
+          <label for="hsc_group">Group / Subject<select id="hsc_group" name="hsc_group"><option value="">Select</option><option value="Science">Science</option><option value="Business Studies">Business Studies</option><option value="Humanities">Humanities</option></select></label>
+          <label for="hsc_board">Board<select id="hsc_board" name="hsc_board"><option value="">Select</option><option value="Dhaka">Dhaka</option><option value="Chattogram">Chattogram</option><option value="Rajshahi">Rajshahi</option><option value="Comilla">Comilla</option><option value="Jessore">Jessore</option><option value="Sylhet">Sylhet</option><option value="Dinajpur">Dinajpur</option><option value="Barishal">Barishal</option><option value="Mymensingh">Mymensingh</option><option value="Madrasah">Madrasah</option><option value="Technical">Technical</option></select></label>
+          <label for="hsc_result">Result<input id="hsc_result" name="hsc_result" type="text" /></label>
+          <label for="hsc_year">Passing Year<input id="hsc_year" name="hsc_year" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="graduation">
+        <legend>Graduation / Equivalent</legend>
+        <div class="grid">
+          <label for="grad_exam">Examination<input id="grad_exam" name="grad_exam" type="text" /></label>
+          <label for="grad_university">University / Institution<input id="grad_university" name="grad_university" type="text" /></label>
+          <label for="grad_year">Passing Year<input id="grad_year" name="grad_year" type="text" /></label>
+          <label for="grad_subject">Subject / Degree<input id="grad_subject" name="grad_subject" type="text" /></label>
+          <label for="grad_result">Result<input id="grad_result" name="grad_result" type="text" /></label>
+          <label for="grad_duration">Course Duration<input id="grad_duration" name="grad_duration" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="masters">
+        <legend>Masters / Equivalent</legend>
+        <div class="grid">
+          <label for="masters_exam">Examination<input id="masters_exam" name="masters_exam" type="text" /></label>
+          <label for="masters_university">University / Institution<input id="masters_university" name="masters_university" type="text" /></label>
+          <label for="masters_year">Passing Year<input id="masters_year" name="masters_year" type="text" /></label>
+          <label for="masters_subject">Subject / Degree<input id="masters_subject" name="masters_subject" type="text" /></label>
+          <label for="masters_result">Result<input id="masters_result" name="masters_result" type="text" /></label>
+          <label for="masters_duration">Course Duration<input id="masters_duration" name="masters_duration" type="text" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="employment">
+        <legend>Job Experience</legend>
+        <div class="grid">
+          <label for="job_designation">Designation / Post<input id="job_designation" name="job_designation" type="text" /></label>
+          <label for="job_organization">Organization<input id="job_organization" name="job_organization" type="text" /></label>
+          <label for="job_start_date">Start Date<input id="job_start_date" name="job_start_date" type="date" /></label>
+          <label for="job_end_date">End Date<input id="job_end_date" name="job_end_date" type="date" /></label>
+          <label for="job_length_service">Length of Service<input id="job_length_service" name="job_length_service" type="text" /></label>
+          <label class="inline-check" for="job_currently_working"><input id="job_currently_working" name="job_currently_working" type="checkbox" /> Currently Working</label>
+          <label for="job_address">Organization Address<input id="job_address" name="job_address" type="text" /></label>
+          <label for="job_description">Job Description<textarea id="job_description" name="job_description" rows="2"></textarea></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-wafa-section="security">
+        <legend>Security &amp; Verification (Intentionally Excluded from Autofill)</legend>
+        <div class="grid">
+          <label for="photo_upload">Applicant Photo (300x300)<input id="photo_upload" name="photo_upload" type="file" /></label>
+          <label for="validation_code">CAPTCHA Validation Code<input id="validation_code" name="validation_code" type="text" placeholder="Enter CAPTCHA manually" /></label>
+        </div>
+      </fieldset>
+    </form>
+  </body>
+</html>

@@ -1,0 +1,1292 @@
+# WAFA FORMAssIST
+# ULTIMATE PREMIUM MASTER ENGINEERING PROMPT
+## Complete Browser Extension + Management Dashboard + Intelligent Autofill Ecosystem
+
+---
+
+# 1. YOUR ROLE
+
+Act as a principal software architect, senior JavaScript engineer, browser extension specialist, application security engineer, product designer, QA automation engineer, and technical project manager.
+
+Your responsibility is to design, engineer, test, and deliver a complete production-oriented software product named:
+
+**WAFA FormAssist Premium**
+
+Do not create a concept, static prototype, landing page, demo dashboard, or simulated product.
+
+Build the actual software with functional features, real data persistence, working interactions, browser integration, robust validation, and documented limitations.
+
+Make engineering decisions independently when requirements are clear. Do not repeatedly ask unnecessary questions.
+
+When essential information is missing, use safe defaults and clearly document assumptions.
+
+Never claim that a feature works unless it has been implemented and tested.
+
+# 2. PRODUCT VISION
+
+Wafa FormAssist is an intelligent government job application management assistant.
+
+It helps users:
+- Maintain reusable personal profiles.
+- Organize educational qualifications.
+- Manage employment history.
+- Maintain present and permanent addresses.
+- Identify supported application forms.
+- Map website fields to saved profile information.
+- Autofill verified fields.
+- Detect missing and invalid information.
+- Review application information before proceeding.
+- Maintain local application session history.
+- Protect sensitive personal information.
+
+The product must work as two connected but independently deployable applications.
+
+**PRODUCT A: WAFA MANAGEMENT DASHBOARD**
+
+A premium web-based management application.
+
+**PRODUCT B: WAFA BROWSER EXTENSION**
+
+A Chrome and Microsoft Edge browser extension using Manifest V3.
+
+Both products must share a consistent design system and data contract.
+
+The browser extension must not depend on the dashboard being open.
+
+# 3. INITIAL WEBSITE INTEGRATION
+
+Primary website:
+
+https://dgbpo.teletalk.com.bd/
+
+Initial application route:
+
+/dgbpo2026/application.php
+
+Organization:
+Bangladesh Post Office, Department of Posts.
+
+Recruitment:
+DGBPO 2026.
+
+Initial supported post:
+Checker [চেকার].
+
+Application fields include:
+
+## Basic Information
+- Applicant Name
+- Applicant Name in Bengali
+- Father's Name
+- Father's Name in Bengali
+- Mother's Name
+- Mother's Name in Bengali
+- Date of Birth
+- Nationality
+- Religion
+- Gender
+- National ID
+- Birth Registration
+- Passport ID
+- Marital Status
+- Mobile Number
+- Confirm Mobile Number
+- Email
+- Quota
+- Departmental Status
+
+## Present Address
+- Care Of
+- Village / Road / House / Flat
+- District
+- Upazila / Police Station
+- Post Office
+- Post Code
+
+## Permanent Address
+- Same as Present Address
+- Care Of
+- Village / Road / House / Flat
+- District
+- Upazila / Police Station
+- Post Office
+- Post Code
+
+## SSC / Equivalent
+- Examination
+- Roll Number
+- Group / Subject
+- Board
+- Result
+- Passing Year
+
+## HSC / Equivalent
+- Examination
+- Roll Number
+- Group / Subject
+- Board
+- Result
+- Passing Year
+
+## Graduation / Equivalent
+- Examination
+- University / Institution
+- Passing Year
+- Subject / Degree
+- Result
+- Course Duration
+
+## Masters / Equivalent
+- Examination
+- University / Institution
+- Passing Year
+- Subject / Degree
+- Result
+- Course Duration
+
+## Job Experience
+- Employment Date
+- Designation / Post
+- Length of Service
+- Start Date
+- End Date
+- Currently Working
+- Organization
+- Address
+- Job Description
+
+Important:
+
+Treat this list as the initial form specification, not verified live DOM data.
+
+Inspect the real application website before implementing final field selectors, option values, field dependencies, or validation rules.
+
+The application URL contains application-specific query parameters. Never hardcode, publish, or log personal application tokens.
+
+# 4. TECHNOLOGY ARCHITECTURE
+
+Use a maintainable modular JavaScript architecture.
+
+## Browser Extension
+- Chrome Extension Manifest V3
+- JavaScript ES Modules
+- Background Service Worker
+- Content Scripts
+- Extension Popup
+- Options / Settings Page
+- Browser Storage APIs
+- IndexedDB
+- Web Crypto API
+
+## Dashboard
+- HTML5
+- CSS3
+- JavaScript ES Modules
+- Responsive layout
+- Accessible interface
+- Reusable components
+
+Use React only if it materially improves the dashboard implementation and the generated project includes a reproducible build configuration.
+
+## Data
+- IndexedDB for structured local records.
+- Chrome Storage for extension settings.
+- Explicitly versioned data schemas.
+- Import and export functionality.
+
+## Security
+- Web Crypto API
+- AES-GCM authenticated encryption
+- PBKDF2 key derivation
+- Secure random salts and IVs
+- No hardcoded encryption secrets.
+
+## Testing
+- Vitest
+- Playwright
+- Browser extension integration tests
+- Simulated Teletalk application fixtures
+
+## Development Environment
+- Google AI Studio Build Mode for initial application development.
+- GitHub for source control.
+- VS Code for local development and debugging.
+- Chrome and Edge for final extension testing.
+
+Do not assume Google AI Studio preview itself provides a complete browser extension runtime.
+
+Generate the actual extension source files and a reproducible external build workflow.
+
+# 5. BRAND IDENTITY AND PREMIUM DESIGN SYSTEM
+
+Create an original, professional identity.
+
+Product:
+WAFA FormAssist
+
+Subtitle:
+Smart Application Management
+
+Visual direction:
+- Premium dark obsidian.
+- Emerald primary accent.
+- Soft neutral surfaces.
+- Subtle gold details where appropriate.
+- Clean typography.
+- Carefully balanced spacing.
+- Consistent border radii.
+- Professional Lucide icons.
+- Subtle micro-interactions.
+- Responsive layouts.
+
+Suggested palette:
+- Background: #0B0F0E
+- Surface: #121A17
+- Elevated Surface: #18231E
+- Primary: #10B981
+- Primary Hover: #059669
+- Secondary: #A7F3D0
+- Main Text: #F4F7F5
+- Muted Text: #9CAAA2
+- Border: #26362F
+- Warning: #F59E0B
+- Error: #EF4444
+
+Provide:
+- Dark theme.
+- Light theme.
+- System theme.
+- Bengali font compatibility.
+- English typography.
+- Responsive desktop and mobile dashboard.
+- Accessible keyboard navigation.
+- Clear loading, empty, success, warning and error states.
+
+Avoid:
+- Generic template appearance.
+- Emoji-based interface icons.
+- Fake statistics.
+- Decorative controls without functionality.
+- Unnecessary animations.
+- Excessive gradients.
+- Unreadable text.
+- Artificial AI-generated content in user data.
+
+# 6. MANAGEMENT DASHBOARD
+
+Build the complete dashboard.
+
+Main navigation:
+
+1. Overview
+2. Personal Profiles
+3. Address Manager
+4. Education Manager
+5. Employment Manager
+6. Autofill Center
+7. Website Manager
+8. Validation Center
+9. Application History
+10. Backup & Restore
+11. Security Center
+12. Settings
+13. Help & Documentation
+
+## 6.1 Overview Dashboard
+
+Show actual calculated information:
+
+- Total profiles.
+- Active profile.
+- Education records.
+- Employment records.
+- Supported websites.
+- Recent autofill sessions.
+- Incomplete profile warnings.
+- Recent validation reports.
+- Storage status.
+- Encryption status.
+
+Provide:
+- Recent activity.
+- Quick actions.
+- Profile completion.
+- System health.
+- Extension connection status.
+
+All dashboard statistics must come from actual stored data.
+
+Do not use invented data.
+
+## 6.2 Personal Profile Manager
+
+Build a complete profile management system.
+
+Profile properties:
+
+- Unique profile ID.
+- Profile name.
+- Applicant full name.
+- Applicant name in Bengali.
+- Father's name in English.
+- Father's name in Bengali.
+- Mother's name in English.
+- Mother's name in Bengali.
+- Date of birth.
+- Nationality.
+- Religion.
+- Gender.
+- National ID.
+- Birth registration.
+- Passport ID.
+- Marital status.
+- Mobile number.
+- Confirmation mobile number.
+- Email.
+- Quota.
+- Departmental status.
+
+Features:
+- Create profile.
+- Edit profile.
+- Duplicate profile.
+- Delete profile.
+- Set default profile.
+- Search profiles.
+- Filter profiles.
+- Import profile.
+- Export profile.
+- Profile completion indicator.
+- Field-level validation.
+- Sensitive field protection.
+
+Do not automatically generate missing personal information.
+
+## 6.3 Address Manager
+
+Support multiple reusable addresses.
+
+Present address:
+- Care Of.
+- Village.
+- Road.
+- House / Flat.
+- District.
+- Upazila / Police Station.
+- Post Office.
+- Post Code.
+
+Permanent address:
+- Same as Present Address.
+- Care Of.
+- Village.
+- Road.
+- House / Flat.
+- District.
+- Upazila / Police Station.
+- Post Office.
+- Post Code.
+
+Features:
+- Same-address synchronization.
+- Independent address editing.
+- Address labels.
+- District selection.
+- Upazila selection.
+- Post Office management.
+- Postal code validation where authoritative datasets exist.
+- Manual entry fallback.
+
+Do not invent administrative divisions or postal codes.
+
+## 6.4 Education Manager
+
+Support:
+- SSC.
+- Dakhil.
+- SSC Vocational.
+- HSC.
+- Alim.
+- HSC Vocational.
+- Diploma.
+- Graduation.
+- Masters.
+- Equivalent qualifications.
+
+Allow configurable examination types.
+
+Store:
+- Examination.
+- Roll number.
+- Registration number where applicable.
+- Group / Subject.
+- Board.
+- Institution / University.
+- Result.
+- Passing year.
+- Degree.
+- Course duration.
+
+Features:
+- Multiple records.
+- Education timeline.
+- Edit and delete.
+- Duplicate detection.
+- Missing data detection.
+- Result format validation.
+- Passing-year validation.
+- Examination-specific field rules.
+
+Never invent qualifications, results, boards, or institutions.
+
+## 6.5 Employment Manager
+
+Allow multiple employment records.
+
+Fields:
+- Organization.
+- Designation.
+- Job description.
+- Organization address.
+- Employment start date.
+- Employment end date.
+- Currently working.
+- Employment category.
+- Service duration.
+
+Features:
+- Add employment.
+- Edit employment.
+- Delete employment.
+- Timeline.
+- Automatically calculate service duration from actual dates.
+- Handle ongoing employment.
+- Detect conflicting date ranges.
+- Preserve user-entered job descriptions.
+
+Never assume that an employment period is verified.
+
+# 7. SMART AUTOFILL ENGINE
+
+This is the most important technical component.
+
+Build a reusable, modular autofill engine.
+
+## 7.1 Website Detection
+
+Detect:
+- Hostname.
+- Supported domain.
+- Application path.
+- Current form type.
+- Available form fields.
+- Extension permission status.
+
+Never run on unsupported websites.
+
+Never assume a website is supported solely because its page title matches.
+
+## 7.2 Form Scanner
+
+Inspect:
+- Input elements.
+- Textareas.
+- Select elements.
+- Radio groups.
+- Checkboxes.
+- Associated labels.
+- Name attributes.
+- ID attributes.
+- Placeholder attributes.
+- Accessible labels.
+- Visible field descriptions.
+
+Support Bengali and English labels.
+
+## 7.3 Field Mapping
+
+Implement a mapping engine using:
+
+1. Exact field name.
+2. Exact field ID.
+3. Associated label.
+4. Normalized label matching.
+5. Bengali synonym matching.
+6. Placeholder matching.
+7. Context-aware matching.
+
+Each mapping must have:
+- Source property.
+- Target element.
+- Confidence level.
+- Matching explanation.
+- Verification status.
+
+Confidence levels:
+- High.
+- Medium.
+- Low.
+- Unmatched.
+
+High-confidence mappings can be proposed for autofill.
+
+Medium-confidence mappings require user confirmation.
+
+Low-confidence mappings must never be automatically filled.
+
+## 7.4 Autofill Execution
+
+Workflow:
+
+1. Detect supported website.
+2. Verify supported application path.
+3. Scan the form.
+4. Generate field mappings.
+5. Load selected profile.
+6. Match profile properties.
+7. Check field compatibility.
+8. Show preview.
+9. Require user approval.
+10. Fill approved fields.
+11. Dispatch appropriate input and change events.
+12. Verify resulting field values.
+13. Generate a completion report.
+
+Support:
+- Text.
+- Email.
+- Telephone.
+- Date.
+- Textarea.
+- Select.
+- Radio.
+- Checkbox.
+
+Handle dynamic forms using MutationObserver where necessary.
+
+Support controlled framework inputs only when their behavior has been tested.
+
+Never directly manipulate framework internals or bypass website validation.
+
+## 7.5 Dropdown Matching
+
+Implement safe option matching.
+
+Compare:
+- Visible option text.
+- Option value.
+- Normalized spelling.
+- Bengali and English equivalents.
+
+Do not select an option when multiple candidates are ambiguous.
+
+Show unresolved dropdowns to the user.
+
+Never invent a dropdown value.
+
+## 7.6 Date Conversion
+
+Support:
+- MM/DD/YYYY.
+- DD/MM/YYYY.
+- YYYY-MM-DD.
+
+Detect expected target format before conversion.
+
+Prevent invalid date transformations.
+
+Preserve the user's original date.
+
+# 8. DGBPO 2026 WEBSITE ADAPTER
+
+Create a dedicated adapter:
+
+DGBPO2026Adapter
+
+Responsibilities:
+
+- Domain verification.
+- Path verification.
+- Application form detection.
+- Field inspection.
+- Label recognition.
+- Dropdown inspection.
+- Field mapping.
+- Validation rules.
+- Autofill execution.
+- Compatibility reporting.
+
+Initial application:
+Checker [চেকার].
+
+Build an adapter configuration that can be extended to other posts and recruitment websites.
+
+Do not assume all Teletalk application forms share identical DOM structures.
+
+Do not hardcode unverified selectors.
+
+Create a simulated local form containing all supplied DGBPO application fields.
+
+Use it for deterministic testing.
+
+For live-site testing:
+- Inspect the real DOM.
+- Identify actual field selectors.
+- Identify actual dropdown options.
+- Verify field dependencies.
+- Test input event behavior.
+- Document unsupported controls.
+- Record compatibility status.
+
+Never claim the DGBPO production integration is verified unless actual testing has succeeded.
+
+# 9. VALIDATION CENTER
+
+Build a standalone validation engine.
+
+Validate:
+
+Personal information:
+- Required fields.
+- Name consistency.
+- Mobile format.
+- Email format.
+- Date validity.
+- Identification number format.
+
+Address:
+- Missing fields.
+- Inconsistent address records.
+- District and Upazila compatibility where verified data exists.
+- Postal code format.
+
+Education:
+- Examination.
+- Roll number.
+- Board.
+- Result.
+- Passing year.
+- Qualification completeness.
+
+Employment:
+- Organization.
+- Designation.
+- Start date.
+- End date.
+- Current employment.
+- Date conflicts.
+
+Form:
+- Missing required values.
+- Invalid values.
+- Unselected required dropdowns.
+- Unresolved mappings.
+- Unsupported fields.
+
+Validation statuses:
+- VALID.
+- WARNING.
+- MISSING.
+- INVALID.
+- NEEDS_REVIEW.
+- UNSUPPORTED.
+
+Every validation message must explain:
+- What is wrong.
+- Why it matters.
+- Which field is affected.
+- How the user can correct it.
+
+Do not automatically change the user's personal information.
+
+# 10. FORM REVIEW CENTER
+
+Before autofill, show a structured preview.
+
+Display:
+
+| Field | Profile Value | Website Field | Status |
+| Applicant Name | Saved value | Detected input | Ready |
+| Date of Birth | Saved value | Detected input | Ready |
+| Religion | Saved value | Detected dropdown | Review |
+| Education | Saved value | Unmatched | Manual |
+
+The example above is a design specification only. Actual values and statuses must be calculated from current data.
+
+Allow:
+- Confirm all safe fields.
+- Select individual fields.
+- Edit mapping.
+- Skip fields.
+- Cancel operation.
+
+After autofill:
+- Show filled count.
+- Show skipped count.
+- Show unresolved count.
+- Show failed count.
+- Show verification status.
+
+# 11. APPLICATION SESSION HISTORY
+
+Record:
+- Session ID.
+- Website domain.
+- Application route.
+- Profile identifier.
+- Timestamp.
+- Number of fields scanned.
+- Number of fields filled.
+- Number of fields skipped.
+- Validation summary.
+- Session status.
+
+Never store complete sensitive field values in activity logs.
+
+Possible statuses:
+- SCANNED.
+- REVIEWED.
+- AUTOFILLED.
+- PARTIALLY_COMPLETED.
+- VALIDATION_REQUIRED.
+- CANCELLED.
+
+Do not imply that an application has been officially submitted or accepted.
+
+# 12. BROWSER EXTENSION
+
+Implement an actual Manifest V3 extension.
+
+Required structure:
+
+- manifest.json
+- background/
+- content/
+- popup/
+- options/
+- shared/
+- adapters/
+- assets/
+- tests/
+
+## 12.1 Popup
+
+Create a premium popup.
+
+Display:
+- Product identity.
+- Active website.
+- Detection status.
+- Current profile.
+- Profile completion.
+- Scan Form.
+- Preview Autofill.
+- Start Autofill.
+- Validation summary.
+- Open Dashboard.
+- Settings.
+
+Buttons must have real functionality.
+
+## 12.2 Background Service Worker
+
+Responsibilities:
+- Extension lifecycle.
+- Message routing.
+- Tab communication.
+- Permission checks.
+- Session coordination.
+- Safe background operations.
+
+Never store sensitive personal information in logs.
+
+## 12.3 Content Scripts
+
+Responsibilities:
+- Supported page detection.
+- DOM inspection.
+- Field mapping.
+- Autofill execution.
+- Result verification.
+- Safe messaging.
+
+Content scripts must only execute on explicitly supported application domains and routes.
+
+## 12.4 Extension Permissions
+
+Request minimum permissions.
+
+Use:
+- Storage.
+- ActiveTab where appropriate.
+- Scripting only when required.
+- Narrow host permissions for supported websites.
+
+Do not request unrestricted access to all websites by default.
+
+# 13. BACKUP AND RESTORE
+
+Implement:
+- Export profile.
+- Export all records.
+- Encrypted backup.
+- Import backup.
+- Schema version verification.
+- Data integrity checks.
+- Duplicate handling.
+- Restore preview.
+- Restore confirmation.
+- Backup error recovery.
+
+Do not silently overwrite existing records.
+
+Never export unencrypted sensitive data without an explicit warning and user confirmation.
+
+# 14. SECURITY CENTER
+
+Security requirements:
+
+- Local-first architecture.
+- AES-GCM encryption.
+- PBKDF2 key derivation.
+- Cryptographically secure random salts.
+- Unique IV per encryption operation.
+- Secure key lifecycle.
+- Lock and unlock.
+- Session timeout.
+- Protected export.
+- Backup integrity.
+- Permission overview.
+- Delete all personal data.
+
+Never:
+- Hardcode passwords.
+- Store encryption keys alongside encrypted data in a recoverable plaintext form.
+- Send personal information to remote APIs.
+- Use external AI services to process personal profiles.
+- Collect NID, passport, OTP, or CAPTCHA data unnecessarily.
+- Log sensitive information.
+- Claim that browser storage provides complete protection against compromised devices.
+
+Provide a clear recovery warning: encrypted data cannot be recovered if the required encryption credential is lost and no valid recovery mechanism exists.
+
+# 15. SETTINGS AND PREFERENCES
+
+Implement:
+- Language selection.
+- Theme selection.
+- Default profile.
+- Autofill confirmation.
+- Field mapping preferences.
+- Website permissions.
+- Session history settings.
+- Backup settings.
+- Security settings.
+- Data deletion.
+- Reset preferences.
+
+Language:
+- Bengali.
+- English.
+
+All user-facing strings must use localization resources.
+
+Do not scatter hardcoded interface text throughout application components.
+
+# 16. WEBSITE MANAGER
+
+Build a modular website management interface.
+
+Display:
+- Website name.
+- Domain.
+- Supported application routes.
+- Adapter name.
+- Detection status.
+- Compatibility status.
+- Last verified date.
+- Supported field count.
+- Known limitations.
+
+Initial entry:
+Bangladesh Post Office Teletalk.
+
+Support future adapters through a versioned adapter registration system.
+
+Never allow arbitrary websites to execute autofill scripts without explicit user permission and compatibility checks.
+
+# 17. TECHNICAL DATA ARCHITECTURE
+
+Create versioned data models.
+
+Core entities:
+
+Profile:
+- id
+- profileName
+- personalInformation
+- createdAt
+- updatedAt
+- isDefault
+
+Address:
+- id
+- profileId
+- addressType
+- careOf
+- village
+- road
+- house
+- district
+- upazila
+- postOffice
+- postCode
+
+Education:
+- id
+- profileId
+- examination
+- rollNumber
+- registrationNumber
+- group
+- board
+- institution
+- result
+- passingYear
+- degree
+- duration
+
+Employment:
+- id
+- profileId
+- organization
+- designation
+- description
+- address
+- startDate
+- endDate
+- currentlyWorking
+
+AutofillSession:
+- id
+- websiteId
+- profileId
+- timestamp
+- scannedCount
+- filledCount
+- skippedCount
+- failedCount
+- status
+
+WebsiteAdapter:
+- id
+- name
+- domain
+- routes
+- version
+- compatibilityStatus
+- capabilities
+
+Use proper indexes, relationships, data migration and integrity checks.
+
+Sensitive values must be encrypted before persistent storage.
+
+Never store plaintext copies of sensitive records in analytics, session history, error reports, or debug logs.
+
+# 18. ERROR HANDLING
+
+Implement a centralized error-handling system.
+
+Handle:
+- Unsupported website.
+- Invalid application route.
+- Permission denied.
+- Form not found.
+- Field mapping failed.
+- Dropdown mismatch.
+- Autofill failure.
+- Storage failure.
+- Encryption failure.
+- Backup corruption.
+- Invalid profile.
+- Browser API unavailable.
+
+Use meaningful error messages in Bengali and English.
+
+Never silently ignore critical errors.
+
+Provide actionable recovery instructions.
+
+# 19. TESTING AND QUALITY ASSURANCE
+
+Build a comprehensive automated test suite.
+
+## Unit Tests
+- Profile validation.
+- Address validation.
+- Education validation.
+- Employment calculations.
+- Date conversion.
+- Field normalization.
+- Bengali matching.
+- Dropdown matching.
+- Encryption.
+- Decryption.
+- Data migration.
+
+## Integration Tests
+- IndexedDB operations.
+- Profile CRUD.
+- Backup and restore.
+- Popup and background messaging.
+- Content script messaging.
+- Autofill workflow.
+- Validation reports.
+
+## Browser Tests
+- Chrome.
+- Microsoft Edge.
+- Manifest validation.
+- Permissions.
+- Website detection.
+- DOM field detection.
+- Form event handling.
+- Dynamic fields.
+
+## Security Tests
+- Sensitive-data leakage.
+- Unauthorized message handling.
+- Permission boundaries.
+- Invalid encryption credentials.
+- Backup tampering.
+- Storage failure.
+- Session locking.
+
+Use a local simulated Teletalk application for repeatable tests.
+
+# 20. PROJECT STRUCTURE
+
+Create the following organized structure:
+
+wafa-formassist/
+│
+├── extension/
+│   ├── manifest.json
+│   ├── background/
+│   │   ├── service-worker.js
+│   │   └── message-router.js
+│   ├── content/
+│   │   ├── content.js
+│   │   ├── form-scanner.js
+│   │   └── autofill-runner.js
+│   ├── popup/
+│   │   ├── popup.html
+│   │   ├── popup.css
+│   │   └── popup.js
+│   ├── options/
+│   ├── adapters/
+│   │   └── dgbpo-2026/
+│   └── assets/
+│
+├── dashboard/
+│   ├── index.html
+│   ├── src/
+│   │   ├── app.js
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── modules/
+│   │   ├── styles/
+│   │   └── localization/
+│   └── assets/
+│
+├── shared/
+│   ├── schemas/
+│   ├── constants/
+│   ├── validation/
+│   ├── field-mapping/
+│   ├── storage/
+│   ├── security/
+│   └── utilities/
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── browser/
+│   └── fixtures/
+│
+├── docs/
+│   ├── architecture.md
+│   ├── installation.md
+│   ├── user-guide-bn.md
+│   ├── user-guide-en.md
+│   ├── privacy.md
+│   └── security.md
+│
+├── scripts/
+├── README.md
+├── SECURITY.md
+├── PRIVACY.md
+├── CHANGELOG.md
+└── package.json
+
+Adapt the structure if necessary, but preserve clear separation of dashboard, extension, shared logic, tests and documentation.
+
+# 21. GOOGLE AI STUDIO BUILD MODE EXECUTION INSTRUCTIONS
+
+You are working in Google AI Studio Build Mode.
+
+Follow these execution requirements:
+
+1. First establish the project architecture.
+2. Inspect available project-generation and file-editing capabilities.
+3. Create actual source files, not just descriptions.
+4. Build the dashboard foundation.
+5. Implement real local storage.
+6. Complete all profile management modules.
+7. Implement encryption.
+8. Implement the extension separately.
+9. Connect the extension and dashboard through a versioned shared data contract.
+10. Build the DGBPO adapter.
+11. Create a simulated Teletalk form.
+12. Implement validation and autofill.
+13. Run tests.
+14. Fix discovered errors.
+15. Prepare reproducible production builds.
+16. Document installation and limitations.
+
+Do not stop after generating the dashboard interface.
+
+If the current Build Mode environment cannot execute a browser extension directly, continue creating its actual source files and test it through an external development workflow.
+
+Do not replace unavailable browser capabilities with fake UI interactions.
+
+Do not claim that ZIP export, GitHub synchronization, browser integration, or live website testing succeeded unless the corresponding operation actually succeeds.
+
+If output limits prevent completing the project in one generation, work in clearly numbered implementation stages and preserve the existing project files.
+
+# 22. PRODUCTION BUILD AND DELIVERY
+
+Deliver:
+
+A. Dashboard
+- Complete source code.
+- Functional responsive dashboard.
+- Production build.
+- Installation instructions.
+
+B. Chrome Extension
+- Complete Manifest V3 source.
+- Installable unpacked extension.
+- Reproducible ZIP package.
+
+C. Microsoft Edge
+- Compatible extension build.
+- Installation instructions.
+- Compatibility report.
+
+D. Engineering Documentation
+- Architecture documentation.
+- Data schema.
+- Security documentation.
+- Privacy documentation.
+- Bengali user manual.
+- English user manual.
+
+E. Testing
+- Unit test results.
+- Integration test results.
+- Browser test results.
+- Known issues.
+- Unverified features.
+
+F. GitHub
+- Clean repository structure.
+- Meaningful commits.
+- README.
+- Build instructions.
+- Release versioning.
+
+Never deliver empty files, fake packages, broken imports, non-functional buttons, hardcoded demonstration records, or untested claims.
+
+# 23. ACCEPTANCE CRITERIA
+
+The product is ready for release only when:
+
+[ ] Dashboard loads correctly.
+[ ] Dashboard navigation works.
+[ ] Profile CRUD works.
+[ ] Address CRUD works.
+[ ] Education CRUD works.
+[ ] Employment CRUD works.
+[ ] Data persists after reload.
+[ ] Sensitive information is encrypted.
+[ ] Backup and restore work.
+[ ] Bengali localization works.
+[ ] English localization works.
+[ ] Chrome extension loads.
+[ ] Edge extension loads.
+[ ] Website detection works.
+[ ] Form scanner works.
+[ ] Field mapping works.
+[ ] Preview works.
+[ ] User-confirmed autofill works.
+[ ] Validation works.
+[ ] Session history works.
+[ ] Privacy controls work.
+[ ] Tests pass.
+[ ] Documentation is complete.
+[ ] Production build is reproducible.
+
+Any failed acceptance criterion must be reported honestly.
+
+# 24. ABSOLUTE PRODUCT RULES
+
+1. Real functionality over visual appearance.
+2. Security over convenience.
+3. Accurate data over automatic guessing.
+4. Explicit user consent over silent actions.
+5. Verified integrations over unsupported claims.
+6. Modular architecture over monolithic code.
+7. Maintainability over unnecessary complexity.
+8. Accessibility over decorative design.
+9. Local-first privacy over unnecessary cloud services.
+10. Complete tested delivery over premature completion.
+
+Never automatically submit an application.
+
+Never bypass CAPTCHA, OTP, website validation, access controls or payment verification.
+
+Never fabricate identity, education, employment or eligibility information.
+
+The user must independently inspect and submit their official application.
+
+# 25. FINAL EXECUTION COMMAND
+
+BEGIN BUILDING WAFA FORMAssIST PREMIUM NOW.
+
+Do not return another planning document.
+
+Start implementing the actual software.
+
+First create the architecture and complete dashboard foundation. Then continue through every required module, the browser extension, DGBPO integration, testing, security hardening, production packaging and documentation.
+
+Maintain a clear implementation checklist.
+
+After every stage:
+- Report files created.
+- Report working functionality.
+- Report tests executed.
+- Report unresolved issues.
+- Continue to the next stage.
+
+Do not ask for confirmation between ordinary implementation stages.
+
+Use production engineering standards throughout.
+
+FINAL GOAL:
+
+Deliver a genuine, premium, secure, bilingual government application management ecosystem with a working Chrome and Microsoft Edge extension and a complete connected management dashboard.
+
+PRODUCT NAME: WAFA FormAssist Premium.
+
+DEVELOPMENT CREDIT: Developed by Mehedi364 (Md. Mehedi Hasan).
