@@ -1,14 +1,25 @@
-// WAFA FormAssist Extension Popup Controller
+// WAFA FormAssist Extension Popup Controller — Encrypted Vault + Safe User-Approved Autofill
 import {mapExtensionFields} from '../shared/field-mapper.js';
 import {validateExtensionProfile} from '../shared/validator.js';
 
 let appState = null;
+let activeTabVerification = null;
+let scannedTabId = null;
 let lastScannedFields = [];
+let lastProtectedSkippedCount = 0;
 let currentMappings = [];
 
+const elVaultBadge = document.getElementById('vault-badge');
+const elBtnLock = document.getElementById('btn-lock');
 const elSiteStatus = document.getElementById('site-status');
 const elSiteDomain = document.getElementById('site-domain');
 const elSiteReason = document.getElementById('site-reason');
+const elLockPanel = document.getElementById('lock-panel');
+const elLockTitle = document.getElementById('lock-title');
+const elLockDesc = document.getElementById('lock-desc');
+const elVaultPassphrase = document.getElementById('vault-passphrase');
+const elBtnUnlock = document.getElementById('btn-unlock');
+const elUnlockedArea = document.getElementById('unlocked-area');
 const elProfileSelect = document.getElementById('profile-select');
 const elCompletionText = document.getElementById('completion-text');
 const elCompletionBar = document.getElementById('completion-bar');
@@ -18,6 +29,7 @@ const elBtnPreview = document.getElementById('btn-preview');
 const elBtnApply = document.getElementById('btn-apply');
 const elPreviewPanel = document.getElementById('preview-panel');
 const elPreviewCounts = document.getElementById('preview-counts');
+const elProtectedNote = document.getElementById('protected-note');
 const elPreviewList = document.getElementById('preview-list');
 const elReportPanel = document.getElementById('report-panel');
 const elReportSummary = document.getElementById('report-summary');
@@ -36,7 +48,8 @@ function showError(msg) {
 }
 
 function getActiveBundle() {
-  const vault = appState?.vault || {profiles: [], addresses: [], educations: [], employments: []};
+  const vault = appState?.vault;
+  if (!vault) return null;
   const selectedId = elProfileSelect.value;
   const profile = vault.profiles.find((p) => p.id === selectedId) || vault.profiles[0] || null;
   if (!profile) return null;
@@ -55,10 +68,14 @@ function renderProfileSummary() {
     elCompletionText.textContent = '0%';
     elCompletionBar.style.width = '0%';
     elValidationSummary.textContent =
-      'No profiles in local extension vault. Open Settings to import an encrypted backup from Dashboard.';
+      'No profiles in encrypted extension vault. Open Settings to import an encrypted backup from Dashboard.';
     return;
   }
-  const val = validateExtensionProfile(bundle.profile, [bundle.presentAddress, bundle.permanentAddress].filter(Boolean), bundle.educations);
+  const val = validateExtensionProfile(
+    bundle.profile,
+    [bundle.presentAddress, bundle.permanentAddress].filter(Boolean),
+    bundle.educations,
+  );
   elCompletionText.textContent = `${val.completionPercent}%`;
   elCompletionBar.style.width = `${val.completionPercent}%`;
   elValidationSummary.textContent =
@@ -73,6 +90,13 @@ function renderPreview() {
   elPreviewCounts.textContent = `${selectedCount} approved · ${currentMappings.length} scanned`;
   elBtnApply.disabled = selectedCount === 0;
 
+  if (lastProtectedSkippedCount > 0) {
+    elProtectedNote.textContent = `Security guard excluded ${lastProtectedSkippedCount} protected field(s) (CAPTCHA / OTP / password / file / payment).`;
+    elProtectedNote.classList.remove('hidden');
+  } else {
+    elProtectedNote.classList.add('hidden');
+  }
+
   for (const m of currentMappings) {
     const row = document.createElement('div');
     row.className = 'preview-item';
@@ -83,6 +107,9 @@ function renderPreview() {
     checkbox.disabled = m.status === 'UNSUPPORTED' || !m.transformedValue;
     checkbox.addEventListener('change', () => {
       m.selectedForFill = checkbox.checked;
+      if (m.requiresOverwriteApproval) {
+        m.allowOverwrite = checkbox.checked;
+      }
       const count = currentMappings.filter((x) => x.selectedForFill).length;
       elPreviewCounts.textContent = `${count} approved · ${currentMappings.length} scanned`;
       elBtnApply.disabled = count === 0;
@@ -91,13 +118,15 @@ function renderPreview() {
     const lbl = document.createElement('label');
     const title = document.createElement('div');
     title.className = 'preview-title';
-    title.textContent = `${m.fieldLabel} (${m.confidence})`;
+    title.textContent = `${m.fieldLabel} (${m.confidence}${m.matchTier ? ` · T${m.matchTier}` : ''})`;
 
     const meta = document.createElement('div');
-    meta.className = 'preview-meta';
-    meta.textContent = m.transformedValue
-      ? `Value: ${m.transformedValue} · ${m.status}`
-      : `${m.status} · ${m.matchReason}`;
+    meta.className = m.requiresOverwriteApproval ? 'preview-meta warn-meta' : 'preview-meta';
+    meta.textContent = m.requiresOverwriteApproval
+      ? `Existing value detected — check to overwrite with "${m.transformedValue}"`
+      : m.transformedValue
+        ? `Value: ${m.transformedValue} · ${m.status}`
+        : `${m.status} · ${m.matchReason}`;
 
     lbl.appendChild(title);
     lbl.appendChild(meta);
@@ -107,18 +136,27 @@ function renderPreview() {
   }
 }
 
-async function init() {
-  showError('');
-  const [stateRes, tabRes] = await Promise.all([
-    chrome.runtime.sendMessage({type: 'WAFA_GET_STATE'}),
-    chrome.runtime.sendMessage({type: 'WAFA_VERIFY_ACTIVE_TAB'}),
-  ]);
-
-  if (!stateRes?.ok) {
-    showError('Could not load local extension storage.');
+function renderVaultUi() {
+  const status = appState?.vaultStatus || {initialized: false, unlocked: false};
+  if (!status.unlocked) {
+    elVaultBadge.textContent = status.initialized ? 'Locked' : 'Not Set Up';
+    elBtnLock.classList.add('hidden');
+    elUnlockedArea.classList.add('hidden');
+    elLockPanel.classList.remove('hidden');
+    elLockTitle.textContent = status.initialized
+      ? 'Vault Locked (AES-GCM-256)'
+      : 'Initialize Encrypted Vault';
+    elLockDesc.textContent = status.initialized
+      ? 'Enter your vault passphrase to decrypt profiles into temporary memory.'
+      : 'Create a strong local passphrase (min 8 chars) to encrypt all extension profile data at rest.';
+    elBtnUnlock.textContent = status.initialized ? 'Unlock Vault' : 'Create Encrypted Vault';
     return;
   }
-  appState = stateRes;
+
+  elVaultBadge.textContent = 'Unlocked';
+  elBtnLock.classList.remove('hidden');
+  elLockPanel.classList.add('hidden');
+  elUnlockedArea.classList.remove('hidden');
 
   const profiles = appState.vault?.profiles || [];
   elProfileSelect.innerHTML = '';
@@ -139,22 +177,70 @@ async function init() {
     }
   }
   renderProfileSummary();
+  elBtnScan.disabled = !activeTabVerification?.supported || profiles.length === 0;
+}
 
-  const ver = tabRes?.verification;
-  if (ver?.supported) {
+async function init() {
+  showError('');
+  const [stateRes, tabRes] = await Promise.all([
+    chrome.runtime.sendMessage({type: 'WAFA_GET_STATE'}),
+    chrome.runtime.sendMessage({type: 'WAFA_VERIFY_ACTIVE_TAB'}),
+  ]);
+
+  if (!stateRes?.ok) {
+    showError(`Could not load local extension storage: ${stateRes?.error || 'UNKNOWN'}`);
+    return;
+  }
+  appState = stateRes;
+  activeTabVerification = tabRes?.verification || null;
+
+  if (activeTabVerification?.supported) {
     elSiteStatus.textContent = 'Supported';
     elSiteStatus.classList.remove('unsupported');
-    elSiteDomain.textContent = `${ver.domain}${ver.route}`;
-    elSiteReason.textContent = ver.reason;
-    elBtnScan.disabled = profiles.length === 0;
+    elSiteDomain.textContent = `${activeTabVerification.domain}${activeTabVerification.route}`;
+    elSiteReason.textContent = activeTabVerification.reason;
   } else {
     elSiteStatus.textContent = 'Unsupported';
     elSiteStatus.classList.add('unsupported');
-    elSiteDomain.textContent = ver?.domain || 'Unknown tab';
-    elSiteReason.textContent = ver?.reason || 'Open a supported recruitment portal route.';
-    elBtnScan.disabled = true;
+    elSiteDomain.textContent = activeTabVerification?.domain || 'Unknown tab';
+    elSiteReason.textContent = activeTabVerification?.reason || 'Open a supported recruitment portal route.';
   }
+
+  renderVaultUi();
 }
+
+elBtnUnlock.addEventListener('click', async () => {
+  showError('');
+  const pass = elVaultPassphrase.value;
+  if (!pass || pass.length < 8) {
+    showError('Passphrase must be at least 8 characters.');
+    return;
+  }
+  const initialized = Boolean(appState?.vaultStatus?.initialized);
+  const res = await chrome.runtime.sendMessage({
+    type: initialized ? 'WAFA_UNLOCK_VAULT' : 'WAFA_SETUP_VAULT',
+    payload: {passphrase: pass},
+  });
+  elVaultPassphrase.value = '';
+  if (!res?.ok) {
+    if (res?.error === 'UNLOCK_RATE_LIMITED') {
+      showError(`Too many failed attempts. Try again in ${res.retryAfterSeconds}s.`);
+    } else {
+      showError('Incorrect passphrase or vault unlock failed.');
+    }
+    return;
+  }
+  await init();
+});
+
+elBtnLock.addEventListener('click', async () => {
+  await chrome.runtime.sendMessage({type: 'WAFA_LOCK_VAULT'});
+  lastScannedFields = [];
+  currentMappings = [];
+  elPreviewPanel.classList.add('hidden');
+  elReportPanel.classList.add('hidden');
+  await init();
+});
 
 elProfileSelect.addEventListener('change', async () => {
   await chrome.runtime.sendMessage({
@@ -168,10 +254,16 @@ elBtnScan.addEventListener('click', async () => {
   showError('');
   const res = await chrome.runtime.sendMessage({type: 'WAFA_SCAN_ACTIVE_TAB'});
   if (!res?.ok) {
+    if (res?.error === 'VAULT_LOCKED') {
+      await init();
+      return;
+    }
     showError(`Scan failed: ${res?.error || 'Could not reach content script on this tab.'}`);
     return;
   }
+  scannedTabId = res.tabId || null;
   lastScannedFields = res.fields || [];
+  lastProtectedSkippedCount = Number(res.protectedSkippedCount || 0);
   const bundle = getActiveBundle();
   if (!bundle) {
     showError('Select or import a profile first.');
@@ -194,28 +286,47 @@ elBtnPreview.addEventListener('click', () => {
 elBtnApply.addEventListener('click', async () => {
   showError('');
   const bundle = getActiveBundle();
-  const approvedFields = currentMappings.filter((m) => m.selectedForFill && m.transformedValue);
-  const skippedCount = currentMappings.filter((m) => !m.selectedForFill && m.status !== 'MANUAL' && m.status !== 'UNRESOLVED_DROPDOWN').length;
-  const unresolvedCount = currentMappings.filter((m) => m.status === 'MANUAL' || m.status === 'UNRESOLVED_DROPDOWN').length;
+  const approvedFields = currentMappings
+    .filter((m) => m.selectedForFill && m.transformedValue)
+    .map((m) => ({
+      elementKey: m.elementKey,
+      fieldLabel: m.fieldLabel,
+      sourceProperty: m.sourceProperty,
+      transformedValue: m.transformedValue,
+      allowOverwrite: Boolean(m.allowOverwrite),
+    }));
+  const skippedCount = currentMappings.filter(
+    (m) => !m.selectedForFill && m.status !== 'MANUAL' && m.status !== 'UNRESOLVED_DROPDOWN',
+  ).length;
+  const unresolvedCount = currentMappings.filter(
+    (m) => m.status === 'MANUAL' || m.status === 'UNRESOLVED_DROPDOWN',
+  ).length;
 
   const res = await chrome.runtime.sendMessage({
     type: 'WAFA_EXECUTE_AUTOFILL',
     payload: {
+      tabId: scannedTabId,
       profileId: bundle?.profile?.id,
       profileName: bundle?.profile?.profileName,
       scannedCount: lastScannedFields.length,
       skippedCount,
       unresolvedCount,
+      protectedSkippedCount: lastProtectedSkippedCount,
       approvedFields,
     },
   });
 
   if (!res?.ok) {
+    if (res?.error === 'VAULT_LOCKED') {
+      await init();
+      return;
+    }
     showError(`Autofill error: ${res?.error || 'Execution blocked'}`);
     return;
   }
   elReportPanel.classList.remove('hidden');
-  elReportSummary.textContent = `Filled & Verified: ${res.result.filledCount} · Skipped: ${skippedCount} · Unresolved: ${unresolvedCount} · Failed: ${res.result.failedCount}`;
+  const totalSkipped = skippedCount + Number(res.result?.skippedCount || 0);
+  elReportSummary.textContent = `Filled & Verified: ${res.result.filledCount} · Skipped: ${totalSkipped} · Unresolved: ${unresolvedCount} · Failed: ${res.result.failedCount}`;
 });
 
 elBtnDashboard.addEventListener('click', () => {

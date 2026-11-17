@@ -201,7 +201,7 @@ export const bn = {
     applyAutofill: 'অনুমোদিত অটোফিল প্রয়োগ করুন',
     resetForm: 'সিমুলেটেড ফর্ম রিসেট',
     targetAdapter: 'সক্রিয় অ্যাডাপ্টার',
-    simulatedNotice: 'লোকাল সিমুলেটেড DGBPO 2026 চেকার [Checker] ফর্ম স্যান্ডবক্স',
+    simulatedNotice: 'লোকাল সিমুলেটেড DGBPO 2026 আবেদন ফর্ম স্যান্ডবক্স',
     reviewTableTitle: 'ফর্ম রিভিউ প্রিভিউ',
     colField: 'ওয়েবসাইট ফিল্ড',
     colProfileValue: 'প্রোফাইল মান',

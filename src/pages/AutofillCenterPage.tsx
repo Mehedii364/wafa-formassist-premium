@@ -33,16 +33,24 @@ export const AutofillCenterPage: React.FC = () => {
 
   const simRef = useRef<SimulatedFormHandle>(null);
   const [scannedFields, setScannedFields] = useState<DetectedFormField[]>([]);
+  const [protectedSkippedCount, setProtectedSkippedCount] = useState<number>(0);
   const [mappings, setMappings] = useState<FieldMappingResult[]>([]);
   const [postReport, setPostReport] = useState<{
     filledCount: number;
     skippedCount: number;
     unresolvedCount: number;
     failedCount: number;
+    protectedSkippedCount: number;
     verified: boolean;
   } | null>(null);
 
-  const sourceOptions = useMemo(() => getAvailableSourceProperties(), []);
+  const sourceOptions = useMemo(() => {
+    const base = getAvailableSourceProperties();
+    const custom = (activeProfile?.customFields || [])
+      .filter((cf) => cf.key && cf.label)
+      .map((cf) => ({value: `custom.${cf.key}`, label: `Custom: ${cf.label}`}));
+    return [...base, ...custom];
+  }, [activeProfile]);
 
   const activeBundle: ProfileBundle | null = useMemo(() => {
     if (!activeProfile) return null;
@@ -61,9 +69,10 @@ export const AutofillCenterPage: React.FC = () => {
 
   const handleScanForm = async () => {
     if (!activeBundle || !simRef.current) return;
-    const fields = simRef.current.scanDomFields();
-    setScannedFields(fields);
-    const mapped = mapDetectedFields(fields, activeBundle, {
+    const scanResult = simRef.current.scanDomFields();
+    setScannedFields(scanResult.fields);
+    setProtectedSkippedCount(scanResult.protectedSkippedCount);
+    const mapped = mapDetectedFields(scanResult.fields, activeBundle, {
       allowMediumConfidenceProposal: settings.allowMediumConfidenceProposal,
     });
     setMappings(mapped);
@@ -84,11 +93,12 @@ export const AutofillCenterPage: React.FC = () => {
       profileId: activeBundle.profile.id,
       profileName: activeBundle.profile.profileName,
       timestamp: new Date().toISOString(),
-      scannedCount: fields.length,
+      scannedCount: scanResult.fields.length,
       filledCount: 0,
       skippedCount: 0,
       unresolvedCount: mapped.filter((m) => m.status === 'MANUAL' || m.status === 'UNRESOLVED_DROPDOWN').length,
       failedCount: 0,
+      protectedSkippedCount: scanResult.protectedSkippedCount,
       validationSummary: {
         valid: val.counts.VALID,
         warnings: val.counts.WARNING,
@@ -99,16 +109,25 @@ export const AutofillCenterPage: React.FC = () => {
       verifiedAfterFill: false,
     });
 
-    pushNotice('info', `Scanned ${fields.length} live DOM fields. Review before filling.`);
+    pushNotice(
+      'info',
+      `Scanned ${scanResult.fields.length} live DOM fields (${scanResult.protectedSkippedCount} protected controls excluded). Review before filling.`,
+    );
   };
 
   const toggleRowSelection = (elementKey: string) => {
     setMappings((prev) =>
-      prev.map((m) =>
-        m.elementKey === elementKey && m.status !== 'UNSUPPORTED' && Boolean(m.transformedValue)
-          ? {...m, selectedForFill: !m.selectedForFill}
-          : m,
-      ),
+      prev.map((m) => {
+        if (m.elementKey !== elementKey || m.status === 'UNSUPPORTED' || !m.transformedValue) {
+          return m;
+        }
+        const nextSelected = !m.selectedForFill;
+        return {
+          ...m,
+          selectedForFill: nextSelected,
+          allowOverwrite: m.requiresOverwriteApproval ? nextSelected : m.allowOverwrite,
+        };
+      }),
     );
   };
 
@@ -126,10 +145,12 @@ export const AutofillCenterPage: React.FC = () => {
             transformedValue: '',
             status: 'MANUAL',
             selectedForFill: false,
+            allowOverwrite: false,
           };
         }
         const val = resolveProfileValue(activeBundle, newSourceProp);
         const optLabel = sourceOptions.find((o) => o.value === newSourceProp)?.label || newSourceProp;
+        const needsOverwrite = Boolean(m.hasExistingValue);
         return {
           ...m,
           sourceProperty: newSourceProp,
@@ -137,9 +158,13 @@ export const AutofillCenterPage: React.FC = () => {
           profileValue: val,
           transformedValue: val,
           confidence: 'MEDIUM',
-          matchReason: 'User manual mapping override',
+          matchReason: needsOverwrite
+            ? 'User manual mapping override · Existing value detected (approve overwrite explicitly)'
+            : 'User manual mapping override',
           status: val ? 'REVIEW' : 'MISSING_VALUE',
-          selectedForFill: Boolean(val),
+          requiresOverwriteApproval: needsOverwrite,
+          selectedForFill: Boolean(val) && !needsOverwrite,
+          allowOverwrite: false,
         };
       }),
     );
@@ -149,13 +174,18 @@ export const AutofillCenterPage: React.FC = () => {
     setMappings((prev) =>
       prev.map((m) => ({
         ...m,
-        selectedForFill: m.confidence === 'HIGH' && m.status === 'READY' && Boolean(m.transformedValue),
+        selectedForFill:
+          !m.requiresOverwriteApproval &&
+          m.confidence === 'HIGH' &&
+          m.status === 'READY' &&
+          Boolean(m.transformedValue),
+        allowOverwrite: false,
       })),
     );
   };
 
   const clearSelection = () => {
-    setMappings((prev) => prev.map((m) => ({...m, selectedForFill: false})));
+    setMappings((prev) => prev.map((m) => ({...m, selectedForFill: false, allowOverwrite: false})));
   };
 
   const handleApplyAutofill = async () => {
@@ -164,16 +194,18 @@ export const AutofillCenterPage: React.FC = () => {
     const unresolvedCount = mappings.filter(
       (m) => m.status === 'MANUAL' || m.status === 'UNRESOLVED_DROPDOWN' || m.status === 'UNSUPPORTED',
     ).length;
-    const skippedCount = mappings.length - approved.length - unresolvedCount;
+    const uncheckedCount = Math.max(0, mappings.length - approved.length - unresolvedCount);
 
     const result = simRef.current.applyApprovedMappings(approved);
-    const verified = result.failedCount === 0 && result.filledCount === approved.length;
+    const totalSkipped = uncheckedCount + result.skippedCount;
+    const verified = result.failedCount === 0 && result.filledCount + result.skippedCount === approved.length;
 
     setPostReport({
       filledCount: result.filledCount,
-      skippedCount: Math.max(0, skippedCount),
+      skippedCount: totalSkipped,
       unresolvedCount,
       failedCount: result.failedCount,
+      protectedSkippedCount,
       verified,
     });
 
@@ -194,9 +226,10 @@ export const AutofillCenterPage: React.FC = () => {
       timestamp: new Date().toISOString(),
       scannedCount: scannedFields.length,
       filledCount: result.filledCount,
-      skippedCount: Math.max(0, skippedCount),
+      skippedCount: totalSkipped,
       unresolvedCount,
       failedCount: result.failedCount,
+      protectedSkippedCount,
       validationSummary: {
         valid: val.counts.VALID,
         warnings: val.counts.WARNING,
@@ -209,7 +242,7 @@ export const AutofillCenterPage: React.FC = () => {
 
     pushNotice(
       verified ? 'success' : 'warning',
-      `Autofill verified: ${result.filledCount} filled, ${result.failedCount} failed.`,
+      `Autofill verified: ${result.filledCount} filled, ${totalSkipped} skipped/preserved, ${result.failedCount} failed.`,
     );
   };
 
@@ -217,6 +250,7 @@ export const AutofillCenterPage: React.FC = () => {
     simRef.current?.resetForm();
     setMappings([]);
     setScannedFields([]);
+    setProtectedSkippedCount(0);
     setPostReport(null);
   };
 
@@ -262,7 +296,7 @@ export const AutofillCenterPage: React.FC = () => {
           <span>{t.autofill.neverAutoSubmit}</span>
         </span>
         <span className="font-mono text-[#0F1714] dark:text-[#F4F7F5]">
-          {DGBPO_2026_ADAPTER.domain}{DGBPO_2026_ADAPTER.routes[0]} · {DGBPO_2026_ADAPTER.initialPost}
+          {DGBPO_2026_ADAPTER.domain}{DGBPO_2026_ADAPTER.routes[0]} · {DGBPO_2026_ADAPTER.recruitmentCycle}
         </span>
       </div>
 
@@ -345,7 +379,7 @@ export const AutofillCenterPage: React.FC = () => {
               {postReport.verified ? 'DOM Verification Passed' : 'Partial Verification — Review Failed Fields'}
             </span>
           </div>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-5 gap-4 text-xs">
             <div>
               <div className="text-[#4F635A] dark:text-[#9CAAA2]">{t.autofill.filledCount}</div>
               <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
@@ -360,6 +394,12 @@ export const AutofillCenterPage: React.FC = () => {
               <div className="text-[#4F635A] dark:text-[#9CAAA2]">{t.autofill.unresolvedCount}</div>
               <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
                 {postReport.unresolvedCount}
+              </div>
+            </div>
+            <div>
+              <div className="text-[#4F635A] dark:text-[#9CAAA2]">Protected Excluded</div>
+              <div className="mt-1 font-mono text-xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+                {postReport.protectedSkippedCount}
               </div>
             </div>
             <div>
@@ -381,6 +421,7 @@ export const AutofillCenterPage: React.FC = () => {
             </h2>
             <span className="font-mono text-xs text-[#4F635A] dark:text-[#9CAAA2]">
               Approved: {approvedCount} · High Confidence: {mappings.filter((m) => m.confidence === 'HIGH').length}
+              {protectedSkippedCount > 0 ? ` · Protected Excluded: ${protectedSkippedCount}` : ''}
             </span>
           </div>
           <div className="max-h-[400px] overflow-auto">
@@ -411,6 +452,16 @@ export const AutofillCenterPage: React.FC = () => {
                     <td className="py-2.5 px-3">
                       <div className="font-medium text-[#0F1714] dark:text-[#F4F7F5]">{m.fieldLabel}</div>
                       <div className="text-[11px] text-[#4F635A] dark:text-[#9CAAA2]">{m.matchReason}</div>
+                      {m.requiresOverwriteApproval && (
+                        <div className="mt-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                          Existing value detected — check to approve overwrite
+                        </div>
+                      )}
+                      {m.dropdownNote && (
+                        <div className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+                          {m.dropdownNote}
+                        </div>
+                      )}
                     </td>
                     <td className="py-2.5 px-3 font-mono text-[#0F1714] dark:text-[#F4F7F5]">
                       {m.status === 'UNSUPPORTED' ? (

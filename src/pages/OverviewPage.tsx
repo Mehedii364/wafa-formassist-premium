@@ -145,7 +145,7 @@ export const OverviewPage: React.FC = () => {
             <span className="text-base text-[#4F635A] dark:text-[#9CAAA2]">·</span> {snapshot.sessions.length}
           </div>
           <div className="mt-1 text-xs text-[#4F635A] dark:text-[#9CAAA2]">
-            DGBPO 2026 Checker [চেকার]
+            DGBPO 2026 Application Portal
           </div>
         </div>
 

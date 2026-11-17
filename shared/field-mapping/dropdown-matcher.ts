@@ -8,11 +8,13 @@ export interface DropdownMatchResult {
   ambiguous: boolean;
   selectedValue: string | null;
   selectedText: string | null;
+  suggestedCandidate: DropdownOption | null;
   strategy:
     | 'exact_value'
     | 'exact_text'
     | 'normalized_spelling'
     | 'bilingual_equivalent'
+    | 'suggested_fuzzy'
     | 'ambiguous'
     | 'unresolved';
   candidates: DropdownOption[];
@@ -57,7 +59,7 @@ export function normalizeOptionToken(input: string): string {
   return input
     .trim()
     .toLowerCase()
-    .replace(/[._\-\/(),[\]]+/g, ' ')
+    .replace(/[._\-/(),[\]]+/g, ' ')
     .replace(/\s+/g, ' ');
 }
 
@@ -74,7 +76,8 @@ function getEquivalents(normalized: string): Set<string> {
 
 /**
  * Safely matches a profile value against real <select> options.
- * Never invents options and refuses to auto-select when multiple candidates are ambiguous.
+ * Never invents options, never auto-selects uncertain/fuzzy partial matches,
+ * and refuses to auto-select when multiple candidates are ambiguous.
  */
 export function matchDropdownOption(
   profileValue: string,
@@ -87,6 +90,7 @@ export function matchDropdownOption(
       ambiguous: false,
       selectedValue: null,
       selectedText: null,
+      suggestedCandidate: null,
       strategy: 'unresolved',
       candidates: [],
     };
@@ -110,6 +114,7 @@ export function matchDropdownOption(
       ambiguous: false,
       selectedValue: exactValueMatches[0].value,
       selectedText: exactValueMatches[0].text,
+      suggestedCandidate: null,
       strategy: 'exact_value',
       candidates: exactValueMatches,
     };
@@ -125,6 +130,7 @@ export function matchDropdownOption(
       ambiguous: false,
       selectedValue: exactTextMatches[0].value,
       selectedText: exactTextMatches[0].text,
+      suggestedCandidate: null,
       strategy: 'exact_text',
       candidates: exactTextMatches,
     };
@@ -143,6 +149,7 @@ export function matchDropdownOption(
       ambiguous: false,
       selectedValue: normMatches[0].value,
       selectedText: normMatches[0].text,
+      suggestedCandidate: null,
       strategy: 'normalized_spelling',
       candidates: normMatches,
     };
@@ -153,12 +160,13 @@ export function matchDropdownOption(
       ambiguous: true,
       selectedValue: null,
       selectedText: null,
+      suggestedCandidate: null,
       strategy: 'ambiguous',
       candidates: normMatches,
     };
   }
 
-  // 4. Bengali <-> English equivalent match
+  // 4. Verified Bengali <-> English equivalent match
   const equivalents = getEquivalents(normTarget);
   const equivMatches = validOptions.filter((o) => {
     const nt = normalizeOptionToken(o.text);
@@ -171,6 +179,7 @@ export function matchDropdownOption(
       ambiguous: false,
       selectedValue: equivMatches[0].value,
       selectedText: equivMatches[0].text,
+      suggestedCandidate: null,
       strategy: 'bilingual_equivalent',
       candidates: equivMatches,
     };
@@ -181,12 +190,14 @@ export function matchDropdownOption(
       ambiguous: true,
       selectedValue: null,
       selectedText: null,
+      suggestedCandidate: null,
       strategy: 'ambiguous',
       candidates: equivMatches,
     };
   }
 
-  // 5. Partial containment check -> ONLY flag ambiguous if >1, or single exact word inclusion if clean
+  // 5. Partial / fuzzy containment check -> NEVER auto-select!
+  // Surface as suggested_fuzzy (single candidate) or ambiguous (>1 candidates) for manual confirmation.
   const wordMatches = validOptions.filter((o) => {
     const nt = normalizeOptionToken(o.text);
     return (
@@ -196,11 +207,12 @@ export function matchDropdownOption(
   });
   if (wordMatches.length === 1) {
     return {
-      matched: true,
+      matched: false,
       ambiguous: false,
-      selectedValue: wordMatches[0].value,
-      selectedText: wordMatches[0].text,
-      strategy: 'normalized_spelling',
+      selectedValue: null,
+      selectedText: null,
+      suggestedCandidate: wordMatches[0],
+      strategy: 'suggested_fuzzy',
       candidates: wordMatches,
     };
   }
@@ -210,6 +222,7 @@ export function matchDropdownOption(
       ambiguous: true,
       selectedValue: null,
       selectedText: null,
+      suggestedCandidate: null,
       strategy: 'ambiguous',
       candidates: wordMatches,
     };
@@ -220,6 +233,7 @@ export function matchDropdownOption(
     ambiguous: false,
     selectedValue: null,
     selectedText: null,
+    suggestedCandidate: null,
     strategy: 'unresolved',
     candidates: [],
   };

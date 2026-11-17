@@ -1,4 +1,5 @@
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
+import {signInWithPopup, signOut} from 'firebase/auth';
 import {mergeRemoteAdapters} from '../../shared/adapters/registry';
 import {getDictionary} from '../../shared/localization';
 import {
@@ -21,6 +22,7 @@ import {
 import {
   decryptJsonWithPassphrase,
   encryptJsonWithPassphrase,
+  MIN_PASSPHRASE_LENGTH,
 } from '../../shared/security/crypto';
 import {
   enqueueLocalVaultChange,
@@ -30,6 +32,7 @@ import {
 } from '../../shared/sync/sync-engine';
 import {DEFAULT_SETTINGS, EMPTY_SNAPSHOT, localVaultRepo} from '../db/indexeddb';
 import {ConnectivityProbeState, useConnectivity} from '../hooks/useConnectivity';
+import {firebaseAuth, googleAuthProvider} from '../lib/firebase';
 
 export type NavPageId =
   | 'overview'
@@ -107,6 +110,12 @@ interface AppContextValue {
   lockVaultNow: () => void;
   unlockVault: (passphrase: string) => Promise<boolean>;
   restoreSnapshot: (incoming: VaultDataSnapshot, strategy: 'skip' | 'merge' | 'replace') => Promise<void>;
+  lastRollbackSnapshot: {
+    createdAt: string;
+    strategy: 'skip' | 'merge' | 'replace';
+    snapshot: VaultDataSnapshot;
+  } | null;
+  rollbackLastRestore: () => Promise<void>;
   eraseAllLocalData: () => Promise<void>;
 
   // Hybrid Sync & Connectivity
@@ -121,6 +130,7 @@ interface AppContextValue {
   pendingDownloadCount: number;
   cloudAuthLogin: (email: string, password: string) => Promise<void>;
   cloudAuthRegister: (email: string, password: string, recoveryHint?: string) => Promise<void>;
+  cloudAuthGoogle: () => Promise<void>;
   cloudAuthLogout: () => Promise<void>;
   cloudDeleteAccount: () => Promise<void>;
   refreshCloudState: () => Promise<void>;
@@ -160,8 +170,13 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
   const [cloudAccount, setCloudAccount] = useState<CloudAccountState | null>(null);
   const [cloudBackups, setCloudBackups] = useState<CloudBackupSummary[]>([]);
   const [notices, setNotices] = useState<ToastNotice[]>([]);
+  const [lastRollbackSnapshot, setLastRollbackSnapshot] = useState<{
+    createdAt: string;
+    strategy: 'skip' | 'merge' | 'replace';
+    snapshot: VaultDataSnapshot;
+  } | null>(null);
 
-  const sessionTokenRef = useRef<string | null>(null);
+  const csrfTokenRef = useRef<string | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const settingsRef = useRef<AppSettings>(settings);
   settingsRef.current = settings;
@@ -311,6 +326,9 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
           ...existing,
           profileName: input.profileName,
           personalInformation: input.personalInformation,
+          customFields: input.customFields !== undefined ? input.customFields : existing.customFields,
+          verifiedFields:
+            input.verifiedFields !== undefined ? input.verifiedFields : existing.verifiedFields,
           isDefault: input.isDefault,
           version: existing.version + 1,
           updatedAt: now,
@@ -326,6 +344,8 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
           schemaVersion: SCHEMA_VERSION,
           profileName: input.profileName,
           personalInformation: input.personalInformation,
+          customFields: input.customFields || [],
+          verifiedFields: input.verifiedFields || {},
           isDefault: makeDefault,
           version: 1,
           createdAt: now,
@@ -671,6 +691,13 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
 
   const restoreSnapshot = useCallback(
     async (incoming: VaultDataSnapshot, strategy: 'skip' | 'merge' | 'replace') => {
+      // Preserve a pre-restore rollback snapshot in memory so the user can revert immediately
+      setLastRollbackSnapshot({
+        createdAt: new Date().toISOString(),
+        strategy,
+        snapshot: structuredClone(snapshot),
+      });
+
       let next: VaultDataSnapshot;
       if (strategy === 'replace') {
         next = incoming;
@@ -696,24 +723,57 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
     [snapshot, commitSnapshot],
   );
 
+  const rollbackLastRestore = useCallback(async () => {
+    if (!lastRollbackSnapshot) return;
+    const prev = lastRollbackSnapshot.snapshot;
+    await commitSnapshot(prev);
+    const def = prev.profiles.find((p) => p.isDefault) || prev.profiles[0] || null;
+    setActiveProfileId(def?.id || null);
+    setLastRollbackSnapshot(null);
+  }, [lastRollbackSnapshot, commitSnapshot]);
+
   const eraseAllLocalData = useCallback(async () => {
     await localVaultRepo.eraseAllLocalData();
     setSnapshot(EMPTY_SNAPSHOT);
     setSettings(DEFAULT_SETTINGS);
     setSyncQueue([]);
     setSyncConflicts([]);
+    setLastRollbackSnapshot(null);
     setActiveProfileId(null);
     setIsLocked(false);
   }, []);
 
-  // --- Optional Cloud Backend Helpers ---
-  const authHeaders = useCallback((): Record<string, string> => {
-    const h: Record<string, string> = {'Content-Type': 'application/json'};
-    if (sessionTokenRef.current) {
-      h.Authorization = `Bearer ${sessionTokenRef.current}`;
+  // --- Optional Cloud Backend Helpers (HttpOnly session cookie + double-submit CSRF header) ---
+  const readCsrfToken = useCallback((): string | null => {
+    if (typeof document !== 'undefined' && document.cookie) {
+      for (const part of document.cookie.split(';')) {
+        const eqIdx = part.indexOf('=');
+        if (eqIdx <= 0) continue;
+        if (part.slice(0, eqIdx).trim() === 'wafa_csrf') {
+          try {
+            return decodeURIComponent(part.slice(eqIdx + 1).trim());
+          } catch {
+            return part.slice(eqIdx + 1).trim();
+          }
+        }
+      }
     }
-    return h;
+    return csrfTokenRef.current;
   }, []);
+
+  const authHeaders = useCallback(
+    (includeCsrf = false): Record<string, string> => {
+      const h: Record<string, string> = {'Content-Type': 'application/json'};
+      if (includeCsrf) {
+        const csrf = readCsrfToken();
+        if (csrf) {
+          h['X-CSRF-Token'] = csrf;
+        }
+      }
+      return h;
+    },
+    [readCsrfToken],
+  );
 
   const refreshCloudState = useCallback(async () => {
     if (!settings.cloudSyncEnabled) return;
@@ -766,7 +826,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Registration failed');
-      sessionTokenRef.current = data.sessionToken || null;
+      csrfTokenRef.current = data.csrfToken || null;
       setCloudAccount({
         id: data.account.id,
         email: data.account.email,
@@ -789,22 +849,39 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Sign in failed');
-      sessionTokenRef.current = data.sessionToken || null;
+      csrfTokenRef.current = data.csrfToken || null;
       await updateSettings({cloudSyncEnabled: true});
       await refreshCloudState();
     },
     [updateSettings, refreshCloudState],
   );
 
+  const cloudAuthGoogle = useCallback(async () => {
+    const credential = await signInWithPopup(firebaseAuth, googleAuthProvider);
+    const idToken = await credential.user.getIdToken();
+    const res = await fetch('/api/v1/auth/firebase', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({idToken}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Google sign-in failed');
+    csrfTokenRef.current = data.csrfToken || null;
+    await updateSettings({cloudSyncEnabled: true});
+    await refreshCloudState();
+  }, [updateSettings, refreshCloudState]);
+
   const cloudAuthLogout = useCallback(async () => {
     try {
       await fetch('/api/v1/auth/logout', {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(),
+        headers: authHeaders(true),
       });
+      await signOut(firebaseAuth).catch(() => {});
     } finally {
-      sessionTokenRef.current = null;
+      csrfTokenRef.current = null;
       setCloudAccount(null);
       setCloudBackups([]);
     }
@@ -814,10 +891,11 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
     const res = await fetch('/api/v1/account', {
       method: 'DELETE',
       credentials: 'include',
-      headers: authHeaders(),
+      headers: authHeaders(true),
     });
     if (!res.ok) throw new Error('Failed to delete cloud account.');
-    sessionTokenRef.current = null;
+    await signOut(firebaseAuth).catch(() => {});
+    csrfTokenRef.current = null;
     setCloudAccount(null);
     setCloudBackups([]);
     await localVaultRepo.saveSyncQueue([]);
@@ -834,8 +912,10 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
       if (!cloudAccount) {
         throw new Error('Sign in to an optional cloud account first.');
       }
-      if (!encryptionPassphrase || encryptionPassphrase.length < 6) {
-        throw new Error('An encryption passphrase (min 6 chars) is mandatory before cloud upload.');
+      if (!encryptionPassphrase || encryptionPassphrase.length < MIN_PASSPHRASE_LENGTH) {
+        throw new Error(
+          `An encryption passphrase (min ${MIN_PASSPHRASE_LENGTH} chars) is mandatory before cloud upload.`,
+        );
       }
       const reachable = await checkConnectivity();
       if (!reachable) {
@@ -854,7 +934,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
         const res = await fetch('/api/v1/sync/push', {
           method: 'POST',
           credentials: 'include',
-          headers: authHeaders(),
+          headers: authHeaders(true),
           body: JSON.stringify({baseVersion, idempotencyKey, envelope}),
         });
         const data = await res.json();
@@ -915,11 +995,16 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
   const uploadEncryptedCloudBackup = useCallback(
     async (label: string, encryptionPassphrase: string) => {
       if (!cloudAccount) throw new Error('Sign in first to upload cloud backup.');
+      if (!encryptionPassphrase || encryptionPassphrase.length < MIN_PASSPHRASE_LENGTH) {
+        throw new Error(
+          `Encryption passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters.`,
+        );
+      }
       const envelope = await encryptJsonWithPassphrase(snapshot, encryptionPassphrase);
       const res = await fetch('/api/v1/backups', {
         method: 'POST',
         credentials: 'include',
-        headers: authHeaders(),
+        headers: authHeaders(true),
         body: JSON.stringify({label, envelope}),
       });
       const data = await res.json();
@@ -945,7 +1030,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
       const res = await fetch(`/api/v1/backups/${encodeURIComponent(backupId)}`, {
         method: 'DELETE',
         credentials: 'include',
-        headers: authHeaders(),
+        headers: authHeaders(true),
       });
       if (!res.ok) throw new Error('Failed to delete cloud backup.');
       await refreshCloudState();
@@ -981,7 +1066,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
         const res = await fetch('/api/v1/sync/push', {
           method: 'POST',
           credentials: 'include',
-          headers: authHeaders(),
+          headers: authHeaders(true),
           body: JSON.stringify({
             baseVersion: target.remoteVersion,
             idempotencyKey: `resolve-${conflictId}-${Date.now()}`,
@@ -1088,6 +1173,8 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
     lockVaultNow,
     unlockVault,
     restoreSnapshot,
+    lastRollbackSnapshot,
+    rollbackLastRestore,
     eraseAllLocalData,
     connectivity,
     connectivityBadgeState,
@@ -1100,6 +1187,7 @@ export const AppProvider: React.FC<{children: React.ReactNode}> = ({children}) =
     pendingDownloadCount,
     cloudAuthLogin,
     cloudAuthRegister,
+    cloudAuthGoogle,
     cloudAuthLogout,
     cloudDeleteAccount,
     refreshCloudState,

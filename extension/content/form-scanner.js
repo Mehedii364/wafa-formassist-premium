@@ -1,4 +1,4 @@
-// WAFA FormAssist Content Script — Bilingual DOM Form Scanner
+// WAFA FormAssist Content Script — Bilingual DOM Form Scanner with Independent Sensitive-Field Exclusion
 (() => {
   function inferSectionHint(el) {
     const section = el.closest('[data-wafa-section], fieldset, section, table');
@@ -17,32 +17,79 @@
     return 'basic';
   }
 
+  function resolveAriaText(idsString) {
+    if (!idsString) return '';
+    return idsString
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((id) => document.getElementById(id)?.textContent?.trim() || '')
+      .filter(Boolean)
+      .join(' ');
+  }
+
   function findLabelText(el) {
     if (el.id) {
       const direct = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      if (direct) return direct.textContent.trim();
+      if (direct) return direct.textContent.replace(/\s*\*\s*$/, '').trim();
     }
+    const labelledBy = resolveAriaText(el.getAttribute('aria-labelledby') || '');
+    if (labelledBy) return labelledBy.replace(/\s*\*\s*$/, '').trim();
+
     const parentLabel = el.closest('label');
-    if (parentLabel) return parentLabel.textContent.trim();
+    if (parentLabel) {
+      const clone = parentLabel.cloneNode(true);
+      clone.querySelectorAll('input, select, textarea').forEach((n) => n.remove());
+      const txt = clone.textContent.replace(/\s*\*\s*$/, '').trim();
+      if (txt) return txt;
+    }
+
     const prevCell = el.closest('td')?.previousElementSibling;
-    if (prevCell) return prevCell.textContent.trim();
-    return el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.name || el.id || '';
+    if (prevCell) return prevCell.textContent.replace(/\s*\*\s*$/, '').trim();
+
+    return (
+      el.getAttribute('aria-label') ||
+      el.getAttribute('placeholder') ||
+      el.name ||
+      el.id ||
+      ''
+    ).trim();
   }
 
   function scanDocumentForms(root = document) {
     const controls = root.querySelectorAll('input, select, textarea');
-    const detected = [];
+    const fields = [];
+    let protectedSkippedCount = 0;
     let counter = 0;
+    const guard = window.__wafaSensitiveFields;
 
     for (const el of controls) {
       const tagName = el.tagName.toLowerCase();
       const inputType = tagName === 'input' ? (el.type || 'text').toLowerCase() : tagName;
       if (['hidden', 'submit', 'button', 'reset', 'image'].includes(inputType)) continue;
-      if (el.disabled) continue;
+      if (el.disabled || el.readOnly) continue;
+
+      const label = findLabelText(el);
+      const describedBy = resolveAriaText(el.getAttribute('aria-describedby') || '');
+
+      // Independent sensitive-field exclusion boundary BEFORE capturing any metadata or value
+      const classification = guard
+        ? guard.classifyDomControl(el, label)
+        : {sensitive: inputType === 'password' || inputType === 'file'};
+
+      if (classification.sensitive) {
+        protectedSkippedCount += 1;
+        continue;
+      }
 
       counter += 1;
       const key = el.getAttribute('data-wafa-key') || `wafa-el-${counter}`;
       el.setAttribute('data-wafa-key', key);
+
+      const hasExistingValue =
+        inputType === 'checkbox' || inputType === 'radio'
+          ? Boolean(el.checked)
+          : String(el.value || '').trim().length > 0;
 
       const field = {
         elementKey: key,
@@ -50,13 +97,15 @@
         inputType,
         name: el.name || '',
         id: el.id || '',
-        label: findLabelText(el),
+        label,
         placeholder: el.getAttribute('placeholder') || '',
         ariaLabel: el.getAttribute('aria-label') || '',
-        description: el.getAttribute('title') || '',
+        autocomplete: el.getAttribute('autocomplete') || '',
+        describedBy,
+        description: [el.getAttribute('title') || '', describedBy].filter(Boolean).join(' ').trim(),
         sectionHint: inferSectionHint(el),
         required: Boolean(el.required),
-        currentValue: inputType === 'checkbox' ? String(el.checked) : String(el.value || ''),
+        hasExistingValue,
       };
 
       if (tagName === 'select') {
@@ -66,10 +115,10 @@
         }));
       }
 
-      detected.push(field);
+      fields.push(field);
     }
 
-    return detected;
+    return {fields, protectedSkippedCount};
   }
 
   window.__wafaFormScanner = {scanDocumentForms};

@@ -1,14 +1,46 @@
 import {EncryptedEnvelope, SCHEMA_VERSION} from '../schemas/types';
 
-export const PBKDF2_ITERATIONS = 310000;
+// OWASP 2023+ recommended PBKDF2-HMAC-SHA256 work factor for new encryptions
+export const PBKDF2_ITERATIONS = 600000;
+export const MIN_PBKDF2_ITERATIONS = 100000;
+export const MAX_PBKDF2_ITERATIONS = 2000000;
+export const MIN_PASSPHRASE_LENGTH = 8;
+export const LEGACY_MIN_PASSPHRASE_LENGTH = 6;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
+const HEX_64_RE = /^[a-f0-9]{64}$/i;
+
+const FORBIDDEN_PLAINTEXT_KEYS = new Set([
+  'profiles',
+  'addresses',
+  'educations',
+  'employments',
+  'personalInformation',
+  'nationalId',
+  'applicantName',
+  'mobileNumber',
+  'birthRegistration',
+  'passportId',
+  'password',
+  'email',
+]);
 
 function getSubtle(): SubtleCrypto {
   if (!globalThis.crypto || !globalThis.crypto.subtle) {
     throw new Error('WEB_CRYPTO_UNAVAILABLE');
   }
   return globalThis.crypto.subtle;
+}
+
+function timingSafeStringEqual(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) {
+    return false;
+  }
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 export function bytesToBase64(bytes: Uint8Array): string {
@@ -23,10 +55,17 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export function base64ToBytes(b64: string): Uint8Array {
-  if (typeof Buffer !== 'undefined') {
-    return new Uint8Array(Buffer.from(b64, 'base64'));
+  if (typeof b64 !== 'string' || !b64.trim()) {
+    throw new Error('ENVELOPE_INVALID');
   }
-  const binary = atob(b64);
+  if (typeof Buffer !== 'undefined') {
+    const normalized = b64.trim();
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(normalized) || normalized.length % 4 !== 0) {
+      throw new Error('ENVELOPE_INVALID');
+    }
+    return new Uint8Array(Buffer.from(normalized, 'base64'));
+  }
+  const binary = atob(b64.trim());
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     out[i] = binary.charCodeAt(i);
@@ -49,13 +88,62 @@ export async function sha256Hex(input: string): Promise<string> {
     .join('');
 }
 
+export function validateEncryptedEnvelope(obj: unknown): obj is EncryptedEnvelope {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return false;
+  const e = obj as Record<string, unknown>;
+
+  for (const forbidden of FORBIDDEN_PLAINTEXT_KEYS) {
+    if (forbidden in e) return false;
+  }
+
+  if (
+    e.algorithm !== 'AES-GCM' ||
+    e.keyDerivation !== 'PBKDF2-SHA256' ||
+    typeof e.iterations !== 'number' ||
+    !Number.isInteger(e.iterations) ||
+    e.iterations < MIN_PBKDF2_ITERATIONS ||
+    e.iterations > MAX_PBKDF2_ITERATIONS ||
+    typeof e.salt !== 'string' ||
+    typeof e.iv !== 'string' ||
+    typeof e.ciphertext !== 'string' ||
+    typeof e.integrityHash !== 'string' ||
+    !HEX_64_RE.test(e.integrityHash) ||
+    typeof e.schemaVersion !== 'string' ||
+    e.schemaVersion.length === 0 ||
+    e.schemaVersion.length > 32
+  ) {
+    return false;
+  }
+
+  try {
+    const saltBytes = base64ToBytes(e.salt);
+    const ivBytes = base64ToBytes(e.iv);
+    const ctBytes = base64ToBytes(e.ciphertext);
+    // AES-GCM requires 12-byte IV, salt >= 16 bytes, ciphertext >= 16-byte auth tag + >= 1 byte
+    if (saltBytes.byteLength < SALT_BYTES) return false;
+    if (ivBytes.byteLength !== IV_BYTES) return false;
+    if (ctBytes.byteLength < 17) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function deriveAesKey(
   passphrase: string,
   salt: Uint8Array,
   iterations = PBKDF2_ITERATIONS,
+  options?: {allowLegacyMinLength?: boolean},
 ): Promise<CryptoKey> {
-  if (!passphrase || passphrase.length < 6) {
+  const minLen = options?.allowLegacyMinLength ? LEGACY_MIN_PASSPHRASE_LENGTH : MIN_PASSPHRASE_LENGTH;
+  if (typeof passphrase !== 'string' || passphrase.length < minLen) {
     throw new Error('PASSPHRASE_TOO_SHORT');
+  }
+  if (!Number.isInteger(iterations) || iterations < MIN_PBKDF2_ITERATIONS || iterations > MAX_PBKDF2_ITERATIONS) {
+    throw new Error('ENVELOPE_INVALID');
+  }
+  if (!(salt instanceof Uint8Array) || salt.byteLength < SALT_BYTES) {
+    throw new Error('ENVELOPE_INVALID');
   }
   const subtle = getSubtle();
   const keyMaterial = await subtle.importKey(
@@ -125,27 +213,22 @@ export async function encryptJsonWithKey(
 }
 
 export async function verifyEnvelopeIntegrity(envelope: EncryptedEnvelope): Promise<boolean> {
-  if (
-    !envelope ||
-    envelope.algorithm !== 'AES-GCM' ||
-    envelope.keyDerivation !== 'PBKDF2-SHA256' ||
-    !envelope.salt ||
-    !envelope.iv ||
-    !envelope.ciphertext ||
-    !envelope.integrityHash
-  ) {
+  if (!validateEncryptedEnvelope(envelope)) {
     return false;
   }
   const expected = await sha256Hex(
     `${envelope.schemaVersion}|AES-GCM|${envelope.iterations}|${envelope.salt}|${envelope.iv}|${envelope.ciphertext}`,
   );
-  return expected === envelope.integrityHash;
+  return timingSafeStringEqual(expected, envelope.integrityHash.toLowerCase());
 }
 
 export async function decryptJsonWithKey<T>(
   envelope: EncryptedEnvelope,
   key: CryptoKey,
 ): Promise<T> {
+  if (!validateEncryptedEnvelope(envelope)) {
+    throw new Error('ENVELOPE_INVALID');
+  }
   const validIntegrity = await verifyEnvelopeIntegrity(envelope);
   if (!validIntegrity) {
     throw new Error('ENVELOPE_INTEGRITY_FAILED');
@@ -170,12 +253,17 @@ export async function decryptJsonWithPassphrase<T>(
   envelope: EncryptedEnvelope,
   passphrase: string,
 ): Promise<T> {
+  if (!validateEncryptedEnvelope(envelope)) {
+    throw new Error('ENVELOPE_INVALID');
+  }
   const validIntegrity = await verifyEnvelopeIntegrity(envelope);
   if (!validIntegrity) {
     throw new Error('ENVELOPE_INTEGRITY_FAILED');
   }
   const salt = base64ToBytes(envelope.salt);
-  const key = await deriveAesKey(passphrase, salt, envelope.iterations || PBKDF2_ITERATIONS);
+  const key = await deriveAesKey(passphrase, salt, envelope.iterations, {
+    allowLegacyMinLength: true,
+  });
   return decryptJsonWithKey<T>(envelope, key);
 }
 

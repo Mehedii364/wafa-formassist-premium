@@ -201,7 +201,7 @@ export const en = {
     applyAutofill: 'Apply Approved Autofill',
     resetForm: 'Reset Simulated Form',
     targetAdapter: 'Active Target Adapter',
-    simulatedNotice: 'Deterministic Local DGBPO 2026 Checker [চেকার] Form Sandbox',
+    simulatedNotice: 'Deterministic Local DGBPO 2026 Application Form Sandbox',
     reviewTableTitle: 'Form Review Preview',
     colField: 'Website Field',
     colProfileValue: 'Profile Value',

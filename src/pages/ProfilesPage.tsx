@@ -18,7 +18,7 @@ import {
   QUOTA_OPTIONS,
   RELIGIONS,
 } from '../../shared/constants/app-constants';
-import {PersonalInformation, ProfileRecord} from '../../shared/schemas/types';
+import {CustomProfileField, PersonalInformation, ProfileRecord} from '../../shared/schemas/types';
 import {maskSensitiveValue} from '../../shared/security/crypto';
 import {calculateProfileCompletion} from '../../shared/validation/validator';
 import {ConfirmDialog} from '../components/ConfirmDialog';
@@ -66,6 +66,7 @@ export const ProfilesPage: React.FC = () => {
   const [profileName, setProfileName] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const [form, setForm] = useState<PersonalInformation>(EMPTY_PERSONAL);
+  const [customFields, setCustomFields] = useState<CustomProfileField[]>([]);
   const [formError, setFormError] = useState('');
   const [revealSensitive, setRevealSensitive] = useState(!settings.maskSensitiveFields);
   const [deleteTarget, setDeleteTarget] = useState<ProfileRecord | null>(null);
@@ -92,6 +93,7 @@ export const ProfilesPage: React.FC = () => {
     setProfileName('');
     setIsDefault(snapshot.profiles.length === 0);
     setForm({...EMPTY_PERSONAL});
+    setCustomFields([]);
     setFormError('');
   };
 
@@ -100,7 +102,29 @@ export const ProfilesPage: React.FC = () => {
     setProfileName(profile.profileName);
     setIsDefault(profile.isDefault);
     setForm({...EMPTY_PERSONAL, ...profile.personalInformation});
+    setCustomFields(profile.customFields ? structuredClone(profile.customFields) : []);
     setFormError('');
+  };
+
+  const addCustomFieldRow = () => {
+    setCustomFields((prev) => [
+      ...prev,
+      {
+        id: `cf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        key: '',
+        label: '',
+        value: '',
+        verified: false,
+      },
+    ]);
+  };
+
+  const updateCustomFieldRow = (id: string, patch: Partial<CustomProfileField>) => {
+    setCustomFields((prev) => prev.map((f) => (f.id === id ? {...f, ...patch} : f)));
+  };
+
+  const removeCustomFieldRow = (id: string) => {
+    setCustomFields((prev) => prev.filter((f) => f.id !== id));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -123,10 +147,20 @@ export const ProfilesPage: React.FC = () => {
       return;
     }
 
+    const sanitizedCustomFields = customFields
+      .map((cf) => ({
+        ...cf,
+        key: cf.key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_'),
+        label: cf.label.trim(),
+        value: cf.value.trim(),
+      }))
+      .filter((cf) => cf.key && cf.label);
+
     await upsertProfile({
       id: editingId === 'new' ? undefined : editingId || undefined,
       profileName: profileName.trim(),
       personalInformation: form,
+      customFields: sanitizedCustomFields,
       isDefault,
     });
     setEditingId(null);
@@ -162,6 +196,7 @@ export const ProfilesPage: React.FC = () => {
       await upsertProfile({
         profileName: `${incoming.profileName} (Imported)`,
         personalInformation: {...EMPTY_PERSONAL, ...incoming.personalInformation},
+        customFields: Array.isArray(incoming.customFields) ? incoming.customFields : [],
         isDefault: snapshot.profiles.length === 0,
       });
       pushNotice('success', `Imported profile "${incoming.profileName}".`);
@@ -486,6 +521,98 @@ export const ProfilesPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Custom Profile Fields (Tier 3 exact key/label autofill mapping) */}
+            <div className="pt-4 border-t border-[#D7E2DC] dark:border-[#26362F] space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#0F1714] dark:text-[#F4F7F5]">
+                    Custom Profile Fields
+                  </h3>
+                  <p className="text-xs text-[#4F635A] dark:text-[#9CAAA2]">
+                    Add portal-specific fields (e.g., driving license, employee ID, freedom fighter cert) for exact autofill matching.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addCustomFieldRow}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#D7E2DC] dark:border-[#26362F] px-3 py-1.5 text-xs font-medium hover:bg-[#EEF3F0] dark:hover:bg-[#18231E]"
+                >
+                  <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                  Add Custom Field
+                </button>
+              </div>
+
+              {customFields.length > 0 && (
+                <div className="space-y-2.5">
+                  {customFields.map((cf, index) => (
+                    <div
+                      key={cf.id}
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end rounded-lg border border-[#D7E2DC] dark:border-[#26362F] bg-[#F6F8F7]/60 dark:bg-[#18231E]/50 p-3"
+                    >
+                      <div className="sm:col-span-3">
+                        <label htmlFor={`cf-key-${cf.id}`} className={lblCls}>
+                          Field Key #{index + 1}
+                        </label>
+                        <input
+                          id={`cf-key-${cf.id}`}
+                          type="text"
+                          value={cf.key}
+                          onChange={(e) => updateCustomFieldRow(cf.id, {key: e.target.value})}
+                          placeholder="e.g., employee_id"
+                          className={`${inputCls} font-mono`}
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label htmlFor={`cf-label-${cf.id}`} className={lblCls}>
+                          Display Label #{index + 1}
+                        </label>
+                        <input
+                          id={`cf-label-${cf.id}`}
+                          type="text"
+                          value={cf.label}
+                          onChange={(e) => updateCustomFieldRow(cf.id, {label: e.target.value})}
+                          placeholder="e.g., Employee ID"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div className="sm:col-span-4">
+                        <label htmlFor={`cf-val-${cf.id}`} className={lblCls}>
+                          Value #{index + 1}
+                        </label>
+                        <input
+                          id={`cf-val-${cf.id}`}
+                          type="text"
+                          value={cf.value}
+                          onChange={(e) => updateCustomFieldRow(cf.id, {value: e.target.value})}
+                          placeholder="Field value"
+                          className={inputCls}
+                        />
+                      </div>
+                      <div className="sm:col-span-2 flex items-center justify-between gap-2 pb-1">
+                        <label className="inline-flex items-center gap-1.5 text-xs text-[#4F635A] dark:text-[#9CAAA2] cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(cf.verified)}
+                            onChange={(e) => updateCustomFieldRow(cf.id, {verified: e.target.checked})}
+                            className="rounded border-[#26362F]"
+                          />
+                          Verified
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => removeCustomFieldRow(cf.id)}
+                          aria-label={`Remove custom field ${cf.label || index + 1}`}
+                          className="rounded-md p-1.5 text-red-600 dark:text-red-400 hover:bg-red-500/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {formError && (
               <p className="text-sm font-medium text-red-600 dark:text-red-400" role="alert">
                 {formError}
@@ -613,6 +740,40 @@ export const ProfilesPage: React.FC = () => {
                       <span>Mobile: {p.personalInformation.mobileNumber || '—'}</span>
                       <span>·</span>
                       <span className="text-emerald-700 dark:text-emerald-400">{comp}% complete</span>
+                      {(() => {
+                        const coreRequired = [
+                          p.personalInformation.applicantName,
+                          p.personalInformation.fatherName,
+                          p.personalInformation.motherName,
+                          p.personalInformation.dateOfBirth,
+                          p.personalInformation.mobileNumber,
+                          p.personalInformation.nationalId || p.personalInformation.birthRegistration,
+                        ];
+                        const missingCore = coreRequired.filter((v) => !v || !v.trim()).length;
+                        const customCount = p.customFields?.length || 0;
+                        const unverifiedCustom = (p.customFields || []).filter((cf) => !cf.verified).length;
+                        return (
+                          <>
+                            {missingCore > 0 && (
+                              <>
+                                <span>·</span>
+                                <span className="text-amber-600 dark:text-amber-400">
+                                  {missingCore} core field{missingCore > 1 ? 's' : ''} missing
+                                </span>
+                              </>
+                            )}
+                            {customCount > 0 && (
+                              <>
+                                <span>·</span>
+                                <span>
+                                  {customCount} custom field{customCount > 1 ? 's' : ''}
+                                  {unverifiedCustom > 0 ? ` (${unverifiedCustom} unverified)` : ''}
+                                </span>
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
 

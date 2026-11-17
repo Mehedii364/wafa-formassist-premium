@@ -12,10 +12,13 @@
         <img src="../assets/icon-48.png" alt="WAFA FormAssist" width="24" height="24" />
         <div>
           <h1>WAFA FormAssist</h1>
-          <p class="subtitle">Smart Application Management</p>
+          <p class="subtitle">Encrypted Offline Vault</p>
         </div>
       </div>
-      <span id="offline-indicator" class="meta-text">Local Vault</span>
+      <div class="topbar-right">
+        <span id="vault-badge" class="meta-text">Locked</span>
+        <button id="btn-lock" class="btn-mini hidden" type="button">Lock</button>
+      </div>
     </header>
 
     <main class="content">
@@ -28,36 +31,58 @@
         <p id="site-reason" class="muted"></p>
       </section>
 
-      <section class="panel">
+      <!-- Encrypted Vault Unlock / Setup Gate -->
+      <section id="lock-panel" class="panel hidden">
         <div class="row-between">
-          <label for="profile-select" class="label">Current Profile</label>
-          <span id="completion-text" class="mono-value">0%</span>
+          <span id="lock-title" class="label">Vault Locked (AES-GCM-256)</span>
         </div>
-        <select id="profile-select" class="select-control"></select>
-        <div class="progress-track">
-          <div id="completion-bar" class="progress-fill" style="width: 0%"></div>
-        </div>
-        <div id="validation-summary" class="muted"></div>
+        <p id="lock-desc" class="muted">
+          Enter your vault passphrase to decrypt profiles into temporary memory.
+        </p>
+        <input
+          id="vault-passphrase"
+          class="input-control"
+          type="password"
+          autocomplete="current-password"
+          placeholder="Vault passphrase (min 8 characters)"
+        />
+        <button id="btn-unlock" class="btn-emerald full-width" type="button">Unlock Vault</button>
       </section>
 
-      <section class="actions">
-        <button id="btn-scan" class="btn-primary" type="button">Scan Form</button>
-        <button id="btn-preview" class="btn-secondary" type="button" disabled>Preview Autofill</button>
-        <button id="btn-apply" class="btn-emerald" type="button" disabled>Start Autofill</button>
-      </section>
+      <!-- Unlocked Controls -->
+      <div id="unlocked-area" class="stack hidden">
+        <section class="panel">
+          <div class="row-between">
+            <label for="profile-select" class="label">Current Profile</label>
+            <span id="completion-text" class="mono-value">0%</span>
+          </div>
+          <select id="profile-select" class="select-control"></select>
+          <div class="progress-track">
+            <div id="completion-bar" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <div id="validation-summary" class="muted"></div>
+        </section>
 
-      <section id="preview-panel" class="panel hidden">
-        <div class="row-between">
-          <span class="label">Approved Field Preview</span>
-          <span id="preview-counts" class="mono-value">0 ready</span>
-        </div>
-        <div id="preview-list" class="preview-list"></div>
-      </section>
+        <section class="actions">
+          <button id="btn-scan" class="btn-primary" type="button">Scan Form</button>
+          <button id="btn-preview" class="btn-secondary" type="button" disabled>Preview Autofill</button>
+          <button id="btn-apply" class="btn-emerald" type="button" disabled>Start Autofill</button>
+        </section>
 
-      <section id="report-panel" class="panel hidden">
-        <div class="label">Verification Report</div>
-        <div id="report-summary" class="mono-value"></div>
-      </section>
+        <section id="preview-panel" class="panel hidden">
+          <div class="row-between">
+            <span class="label">Approved Field Preview</span>
+            <span id="preview-counts" class="mono-value">0 ready</span>
+          </div>
+          <p id="protected-note" class="muted hidden"></p>
+          <div id="preview-list" class="preview-list"></div>
+        </section>
+
+        <section id="report-panel" class="panel hidden">
+          <div class="label">Verification Report</div>
+          <div id="report-summary" class="mono-value"></div>
+        </section>
+      </div>
 
       <div id="error-banner" class="error-banner hidden"></div>
     </main>

@@ -7,6 +7,7 @@ import {
 } from '../../shared/field-mapping/date-converter';
 import {matchDropdownOption} from '../../shared/field-mapping/dropdown-matcher';
 import {mapDetectedFields, type ProfileBundle} from '../../shared/field-mapping/mapper';
+import {mapExtensionFields} from '../../extension/shared/field-mapper.js';
 import {DetectedFormField, SCHEMA_VERSION} from '../../shared/schemas/types';
 
 function makeBundle(): ProfileBundle {
@@ -20,6 +21,15 @@ function makeBundle(): ProfileBundle {
       version: 1,
       createdAt: now,
       updatedAt: now,
+      customFields: [
+        {
+          id: 'cf-1',
+          key: 'employee_id',
+          label: 'Employee ID',
+          value: 'EMP-2026-088',
+          verified: true,
+        },
+      ],
       personalInformation: {
         applicantName: 'Nadia Islam',
         applicantNameBn: 'নাদিয়া ইসলাম',
@@ -107,7 +117,7 @@ test('date converter validates leap years and converts YYYY-MM-DD / DD/MM/YYYY /
   assert.equal(detectExpectedDateFormat({inputType: 'text', placeholder: 'MM/DD/YYYY'}), 'MM/DD/YYYY');
 });
 
-test('dropdown matcher handles bilingual equivalents and refuses ambiguous matches', () => {
+test('dropdown matcher handles bilingual equivalents, refuses ambiguous matches, and never auto-selects fuzzy partial matches', () => {
   const religionRes = matchDropdownOption('Islam', [
     {value: '', text: '--Select--'},
     {value: '1', text: 'ইসলাম'},
@@ -133,10 +143,20 @@ test('dropdown matcher handles bilingual equivalents and refuses ambiguous match
   assert.equal(ambigRes.matched, false);
   assert.equal(ambigRes.ambiguous, true);
   assert.equal(ambigRes.selectedValue, null);
+
+  // Partial/fuzzy match must NEVER auto-select — returns suggested_fuzzy only
+  const fuzzyRes = matchDropdownOption('Science', [
+    {value: 'sci_ext', text: 'General Science & Technology Track'},
+  ]);
+  assert.equal(fuzzyRes.matched, false);
+  assert.equal(fuzzyRes.strategy, 'suggested_fuzzy');
+  assert.equal(fuzzyRes.selectedValue, null);
+  assert.equal(fuzzyRes.suggestedCandidate?.value, 'sci_ext');
 });
 
-test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/password, and never auto-selects LOW', () => {
+test('mapDetectedFields enforces 6-tier matching, customFields, overwrite approval, sensitive blocking, and extension parity', () => {
   const fields: DetectedFormField[] = [
+    // Tier 1: Exact ID
     {
       elementKey: 'k1',
       tagName: 'input',
@@ -150,6 +170,7 @@ test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/passwor
       sectionHint: 'basic',
       required: true,
     },
+    // Tier 4: Bangla equivalent label
     {
       elementKey: 'k2',
       tagName: 'input',
@@ -163,6 +184,7 @@ test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/passwor
       sectionHint: 'basic',
       required: true,
     },
+    // Protected CAPTCHA
     {
       elementKey: 'k3',
       tagName: 'input',
@@ -176,6 +198,7 @@ test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/passwor
       sectionHint: 'security',
       required: true,
     },
+    // Protected File Upload
     {
       elementKey: 'k4',
       tagName: 'input',
@@ -189,6 +212,7 @@ test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/passwor
       sectionHint: 'uploads',
       required: true,
     },
+    // Tier 6: Weak contextual description -> LOW -> NEVER auto-selected
     {
       elementKey: 'k5',
       tagName: 'input',
@@ -202,15 +226,63 @@ test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/passwor
       sectionHint: 'basic',
       required: false,
     },
+    // Tier 3: Custom Profile Field match
+    {
+      elementKey: 'k6',
+      tagName: 'input',
+      inputType: 'text',
+      name: 'employee_id',
+      id: 'employee_id',
+      label: 'Employee ID',
+      placeholder: '',
+      ariaLabel: '',
+      description: '',
+      sectionHint: 'basic',
+      required: false,
+    },
+    // Existing user-entered value must require explicit overwrite approval
+    {
+      elementKey: 'k7',
+      tagName: 'input',
+      inputType: 'text',
+      name: 'father_name',
+      id: 'father_name',
+      label: "Father's Name",
+      placeholder: '',
+      ariaLabel: '',
+      description: '',
+      sectionHint: 'basic',
+      required: true,
+      hasExistingValue: true,
+      currentValue: 'Manually Typed Father Name',
+    },
+    // Protected OTP
+    {
+      elementKey: 'k8',
+      tagName: 'input',
+      inputType: 'text',
+      autocomplete: 'one-time-code',
+      name: 'otp_code',
+      id: 'otp_code',
+      label: 'OTP Verification Code',
+      placeholder: '',
+      ariaLabel: '',
+      description: '',
+      sectionHint: 'security',
+      required: true,
+    },
   ];
 
-  const mapped = mapDetectedFields(fields, makeBundle());
+  const bundle = makeBundle();
+  const mapped = mapDetectedFields(fields, bundle);
   const byKey = new Map(mapped.map((m) => [m.elementKey, m]));
 
+  assert.equal(byKey.get('k1')?.matchTier, 1);
   assert.equal(byKey.get('k1')?.confidence, 'HIGH');
   assert.equal(byKey.get('k1')?.selectedForFill, true);
   assert.equal(byKey.get('k1')?.transformedValue, 'Nadia Islam');
 
+  assert.equal(byKey.get('k2')?.matchTier, 4);
   assert.equal(byKey.get('k2')?.confidence, 'HIGH');
   assert.equal(byKey.get('k2')?.transformedValue, 'নাদিয়া ইসলাম');
 
@@ -219,8 +291,30 @@ test('mapDetectedFields enforces 7-layer matching, protects CAPTCHA/file/passwor
   assert.equal(byKey.get('k3')?.selectedForFill, false);
   assert.equal(byKey.get('k4')?.status, 'UNSUPPORTED');
   assert.equal(byKey.get('k4')?.selectedForFill, false);
+  assert.equal(byKey.get('k8')?.status, 'UNSUPPORTED');
+  assert.equal(byKey.get('k8')?.selectedForFill, false);
 
-  // Weak description hint -> LOW confidence -> NEVER selected for autofill
+  // Weak description hint -> Tier 6 LOW confidence -> NEVER selected for autofill
+  assert.equal(byKey.get('k5')?.matchTier, 6);
   assert.equal(byKey.get('k5')?.confidence, 'LOW');
   assert.equal(byKey.get('k5')?.selectedForFill, false);
+
+  // Custom field matched at Tier 3
+  assert.equal(byKey.get('k6')?.matchTier, 3);
+  assert.equal(byKey.get('k6')?.sourceProperty, 'custom.employee_id');
+  assert.equal(byKey.get('k6')?.transformedValue, 'EMP-2026-088');
+  assert.equal(byKey.get('k6')?.selectedForFill, true);
+
+  // Existing user value flagged for explicit overwrite approval and NOT auto-selected
+  assert.equal(byKey.get('k7')?.requiresOverwriteApproval, true);
+  assert.equal(byKey.get('k7')?.selectedForFill, false);
+  assert.equal(byKey.get('k7')?.status, 'REVIEW');
+
+  // Verify extension field-mapper parity
+  const extMapped = mapExtensionFields(fields, bundle);
+  const extByKey = new Map(extMapped.map((m: {elementKey: string}) => [m.elementKey, m]));
+  assert.equal((extByKey.get('k6') as {transformedValue: string})?.transformedValue, 'EMP-2026-088');
+  assert.equal((extByKey.get('k7') as {requiresOverwriteApproval: boolean; selectedForFill: boolean})?.requiresOverwriteApproval, true);
+  assert.equal((extByKey.get('k7') as {selectedForFill: boolean})?.selectedForFill, false);
+  assert.equal((extByKey.get('k8') as {status: string})?.status, 'UNSUPPORTED');
 });

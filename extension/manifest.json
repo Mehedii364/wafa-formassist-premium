@@ -26,7 +26,8 @@
   "permissions": [
     "storage",
     "activeTab",
-    "scripting"
+    "scripting",
+    "alarms"
   ],
   "host_permissions": [
     "https://dgbpo.teletalk.com.bd/*"
@@ -37,6 +38,7 @@
         "https://dgbpo.teletalk.com.bd/dgbpo2026/application.php*"
       ],
       "js": [
+        "content/sensitive-fields.js",
         "content/form-scanner.js",
         "content/autofill-runner.js",
         "content/content.js"

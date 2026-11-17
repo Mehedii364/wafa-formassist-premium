@@ -5,7 +5,7 @@ export const DGBPO_2026_ADAPTER = {
   name: 'Bangladesh Post Office (DGBPO 2026)',
   organization: 'Bangladesh Post Office, Department of Posts',
   recruitment: 'DGBPO 2026',
-  post: 'Checker [চেকার]',
+  post: 'General Recruitment Application',
   domain: 'dgbpo.teletalk.com.bd',
   routes: ['/dgbpo2026/application.php'],
   version: '1.0.0',

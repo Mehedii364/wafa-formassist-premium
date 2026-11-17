@@ -30,6 +30,7 @@ export const SyncCenterPage: React.FC = () => {
     updateSettings,
     cloudAuthLogin,
     cloudAuthRegister,
+    cloudAuthGoogle,
     cloudAuthLogout,
     cloudDeleteAccount,
     refreshCloudState,
@@ -73,6 +74,18 @@ export const SyncCenterPage: React.FC = () => {
     }
   };
 
+  const handleGoogleSignIn = async () => {
+    setAuthBusy(true);
+    try {
+      await cloudAuthGoogle();
+      pushNotice('success', 'Signed in with Google for optional encrypted cloud sync.');
+    } catch (err) {
+      pushNotice('error', err instanceof Error ? err.message : 'Google sign-in failed.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
   const handleSyncNow = async () => {
     setActionBusy(true);
     try {
@@ -92,8 +105,8 @@ export const SyncCenterPage: React.FC = () => {
 
   const handleUploadCloudBackup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cloudPassphrase || cloudPassphrase.length < 6) {
-      pushNotice('error', 'Enter a client-side encryption passphrase (min 6 chars) first.');
+    if (!cloudPassphrase || cloudPassphrase.length < 8) {
+      pushNotice('error', 'Enter a client-side encryption passphrase (min 8 chars) first.');
       return;
     }
     setActionBusy(true);
@@ -129,8 +142,8 @@ export const SyncCenterPage: React.FC = () => {
     conflictId: string,
     choice: 'keep_local' | 'keep_remote' | 'merge_both',
   ) => {
-    if (!cloudPassphrase || cloudPassphrase.length < 6) {
-      pushNotice('error', 'Enter your cloud encryption passphrase to decrypt/re-encrypt conflict resolution.');
+    if (!cloudPassphrase || cloudPassphrase.length < 8) {
+      pushNotice('error', 'Enter your cloud encryption passphrase (min 8 chars) to decrypt/re-encrypt conflict resolution.');
       return;
     }
     setActionBusy(true);
@@ -382,31 +395,49 @@ export const SyncCenterPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleAuthSubmit} className="space-y-4">
-                <div className="flex items-center gap-2 border-b border-[#D7E2DC] dark:border-[#26362F] pb-3">
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('register')}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                      authMode === 'register'
-                        ? 'bg-emerald-600 text-white'
-                        : 'text-[#4F635A] dark:text-[#9CAAA2] hover:bg-[#EEF3F0] dark:hover:bg-[#18231E]'
-                    }`}
-                  >
-                    {t.sync.register}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAuthMode('login')}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                      authMode === 'login'
-                        ? 'bg-emerald-600 text-white'
-                        : 'text-[#4F635A] dark:text-[#9CAAA2] hover:bg-[#EEF3F0] dark:hover:bg-[#18231E]'
-                    }`}
-                  >
-                    {t.sync.login}
-                  </button>
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  disabled={authBusy}
+                  onClick={() => void handleGoogleSignIn()}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-[#D7E2DC] dark:border-[#26362F] bg-[#F6F8F7] dark:bg-[#18231E] px-4 py-2.5 text-sm font-semibold text-[#0F1714] dark:text-[#F4F7F5] hover:bg-[#EEF3F0] dark:hover:bg-[#1E2B25] disabled:opacity-50 transition-colors"
+                >
+                  <span>Continue with Google</span>
+                </button>
+
+                <div className="relative flex items-center py-1">
+                  <div className="flex-grow border-t border-[#D7E2DC] dark:border-[#26362F]" />
+                  <span className="mx-3 shrink text-xs text-[#4F635A] dark:text-[#9CAAA2]">
+                    or use email &amp; password
+                  </span>
+                  <div className="flex-grow border-t border-[#D7E2DC] dark:border-[#26362F]" />
                 </div>
+
+                <form onSubmit={handleAuthSubmit} className="space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#D7E2DC] dark:border-[#26362F] pb-3">
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('register')}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                        authMode === 'register'
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-[#4F635A] dark:text-[#9CAAA2] hover:bg-[#EEF3F0] dark:hover:bg-[#18231E]'
+                      }`}
+                    >
+                      {t.sync.register}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthMode('login')}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                        authMode === 'login'
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-[#4F635A] dark:text-[#9CAAA2] hover:bg-[#EEF3F0] dark:hover:bg-[#18231E]'
+                      }`}
+                    >
+                      {t.sync.login}
+                    </button>
+                  </div>
 
                 <div>
                   <label htmlFor="cloud-email" className="block text-xs font-medium text-[#0F1714] dark:text-[#F4F7F5]">
@@ -454,18 +485,19 @@ export const SyncCenterPage: React.FC = () => {
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={authBusy}
-                  className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                >
-                  {authBusy
-                    ? 'Connecting...'
-                    : authMode === 'register'
-                      ? t.sync.register
-                      : t.sync.login}
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={authBusy}
+                    className="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    {authBusy
+                      ? 'Connecting...'
+                      : authMode === 'register'
+                        ? t.sync.register
+                        : t.sync.login}
+                  </button>
+                </form>
+              </div>
             )}
           </section>
 
@@ -493,7 +525,7 @@ export const SyncCenterPage: React.FC = () => {
                 type="password"
                 value={cloudPassphrase}
                 onChange={(e) => setCloudPassphrase(e.target.value)}
-                placeholder="Min 6 chars — stays strictly in your browser"
+                placeholder="Min 8 chars — stays strictly in your browser"
                 className="mt-1.5 w-full rounded-lg border border-[#D7E2DC] dark:border-[#26362F] bg-[#F6F8F7] dark:bg-[#18231E] px-3 py-2 text-sm text-[#0F1714] dark:text-[#F4F7F5]"
               />
             </div>

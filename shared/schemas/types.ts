@@ -26,11 +26,21 @@ export interface PersonalInformation {
   departmentalStatus: string;
 }
 
+export interface CustomProfileField {
+  id: string;
+  key: string;
+  label: string;
+  value: string;
+  verified?: boolean;
+}
+
 export interface ProfileRecord {
   id: string;
   schemaVersion: string;
   profileName: string;
   personalInformation: PersonalInformation;
+  customFields?: CustomProfileField[];
+  verifiedFields?: Record<string, boolean>;
   isDefault: boolean;
   version: number;
   createdAt: string;
@@ -131,6 +141,7 @@ export interface AutofillSessionRecord {
   skippedCount: number;
   unresolvedCount: number;
   failedCount: number;
+  protectedSkippedCount?: number;
   validationSummary: {
     valid: number;
     warnings: number;
@@ -179,10 +190,13 @@ export interface DetectedFormField {
   label: string;
   placeholder: string;
   ariaLabel: string;
+  autocomplete?: string;
+  describedBy?: string;
   description: string;
   sectionHint: string;
   required: boolean;
   options?: Array<{value: string; text: string}>;
+  hasExistingValue?: boolean;
   currentValue?: string;
 }
 
@@ -197,9 +211,14 @@ export interface FieldMappingResult {
   profileValue: string;
   transformedValue: string;
   confidence: ConfidenceLevel;
+  matchTier?: 1 | 2 | 3 | 4 | 5 | 6;
   matchReason: string;
   status: 'READY' | 'REVIEW' | 'MANUAL' | 'UNRESOLVED_DROPDOWN' | 'MISSING_VALUE' | 'UNSUPPORTED';
   selectedForFill: boolean;
+  hasExistingValue?: boolean;
+  requiresOverwriteApproval?: boolean;
+  allowOverwrite?: boolean;
+  suggestedOption?: {value: string; text: string};
   dropdownNote?: string;
   dateFormatUsed?: string;
 }

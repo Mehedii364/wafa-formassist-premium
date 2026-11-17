@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {AlertTriangle, CheckCircle2, Download, FileUp, Lock, ShieldCheck} from 'lucide-react';
+import {AlertTriangle, CheckCircle2, Download, FileUp, Lock, RotateCcw, ShieldCheck} from 'lucide-react';
 import {ConfirmDialog} from '../components/ConfirmDialog';
 import {useApp} from '../context/AppContext';
 import {localVaultRepo} from '../db/indexeddb';
@@ -18,7 +18,7 @@ function downloadJsonFile(filename: string, data: unknown) {
 }
 
 export const BackupRestorePage: React.FC = () => {
-  const {snapshot, t, restoreSnapshot, pushNotice} = useApp();
+  const {snapshot, t, restoreSnapshot, lastRollbackSnapshot, rollbackLastRestore, pushNotice} = useApp();
 
   // Export state
   const [exportPass, setExportPass] = useState('');
@@ -35,6 +35,7 @@ export const BackupRestorePage: React.FC = () => {
   const [inspectError, setInspectError] = useState('');
   const [preview, setPreview] = useState<{packageMeta: BackupPackage; snapshot: VaultDataSnapshot} | null>(null);
   const [confirmReplaceOpen, setConfirmReplaceOpen] = useState(false);
+  const [confirmRollbackOpen, setConfirmRollbackOpen] = useState(false);
 
   const handleEncryptedExport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -136,6 +137,36 @@ export const BackupRestorePage: React.FC = () => {
         </h1>
         <p className="mt-1 text-sm text-[#4F635A] dark:text-[#9CAAA2]">{t.backup.subtitle}</p>
       </div>
+
+      {lastRollbackSnapshot && (
+        <section
+          aria-label="Pre-restore rollback snapshot"
+          className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4 flex flex-wrap items-center justify-between gap-4"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+              <RotateCcw className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>Pre-Restore Rollback Snapshot Available</span>
+            </div>
+            <p className="text-xs text-[#4F635A] dark:text-[#9CAAA2] tabular-nums">
+              Captured {new Date(lastRollbackSnapshot.createdAt).toLocaleString()} before{' '}
+              <span className="font-mono">{lastRollbackSnapshot.strategy}</span> restore ·{' '}
+              {lastRollbackSnapshot.snapshot.profiles.length} profiles ·{' '}
+              {lastRollbackSnapshot.snapshot.addresses.length} addresses ·{' '}
+              {lastRollbackSnapshot.snapshot.educations.length} education ·{' '}
+              {lastRollbackSnapshot.snapshot.employments.length} employment
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setConfirmRollbackOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-600/40 bg-white dark:bg-[#121A17] px-3.5 py-2 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-500/10 whitespace-nowrap"
+          >
+            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Rollback Last Restore</span>
+          </button>
+        </section>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Local Export */}
@@ -352,12 +383,27 @@ export const BackupRestorePage: React.FC = () => {
       <ConfirmDialog
         open={confirmReplaceOpen}
         title="Replace Entire Local Vault?"
-        body="Replace mode overwrites all current local profiles, addresses, education, employment, and session records with the contents of this backup."
+        body="Replace mode overwrites all current local profiles, addresses, education, employment, and session records with the contents of this backup. A pre-restore rollback snapshot will be kept in this session."
         confirmLabel={t.backup.confirmRestore}
         cancelLabel={t.common.cancel}
         danger
         onConfirm={() => void executeRestore()}
         onCancel={() => setConfirmReplaceOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmRollbackOpen}
+        title="Rollback Last Restore?"
+        body="This restores your local IndexedDB vault to the exact pre-restore snapshot captured right before your previous import."
+        confirmLabel="Rollback Vault"
+        cancelLabel={t.common.cancel}
+        onConfirm={() => {
+          setConfirmRollbackOpen(false);
+          void rollbackLastRestore().then(() =>
+            pushNotice('success', 'Rolled back local vault to the pre-restore snapshot.'),
+          );
+        }}
+        onCancel={() => setConfirmRollbackOpen(false)}
       />
     </div>
   );

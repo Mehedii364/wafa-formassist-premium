@@ -385,7 +385,7 @@ export function validateProfileSuite(params: {
       'Education Records',
       'MISSING',
       {en: 'No educational qualifications recorded for this profile.', bn: 'এই প্রোফাইলে কোনো শিক্ষাগত যোগ্যতা যুক্ত নেই।'},
-      {en: 'DGBPO 2026 Checker requires verified SSC/HSC or equivalent education records.', bn: 'DGBPO 2026 পদের জন্য শিক্ষাগত যোগ্যতার তথ্য আবশ্যক।'},
+      {en: 'DGBPO 2026 applications require verified SSC/HSC or equivalent education records.', bn: 'DGBPO 2026 আবেদনের জন্য শিক্ষাগত যোগ্যতার তথ্য আবশ্যক।'},
       {en: 'Add SSC, HSC, and higher qualifications in Education Manager.', bn: 'এডুকেশন ম্যানেজারে এসএসসি, এইচএসসি ও উচ্চতর ডিগ্রি যুক্ত করুন।'},
     );
   }

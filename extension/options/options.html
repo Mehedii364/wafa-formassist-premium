@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>WAFA FormAssist — Extension Settings &amp; Vault</title>
+    <title>WAFA FormAssist — Extension Settings &amp; Encrypted Vault</title>
     <link rel="stylesheet" href="options.css" />
   </head>
   <body>
@@ -12,10 +12,25 @@
         <div>
           <h1>WAFA FormAssist Extension Settings</h1>
           <p class="muted">
-            Import an AES-GCM encrypted backup exported from your Management Dashboard so the extension works 100% offline independently.
+            All personal profile data inside this extension is encrypted at rest with AES-GCM-256 + PBKDF2-SHA256 (600,000 iterations). Keys remain strictly in memory and auto-lock on inactivity.
           </p>
         </div>
       </header>
+
+      <section class="card">
+        <h2>Encrypted Local Vault Status</h2>
+        <p id="vault-summary" class="mono">Loading...</p>
+        <div class="field" style="margin-top: 12px;">
+          <label for="vault-passphrase">Extension Vault Passphrase (min 8 characters)</label>
+          <input id="vault-passphrase" type="password" placeholder="Enter passphrase to unlock or initialize vault" />
+        </div>
+        <div class="row-actions">
+          <button id="btn-vault-unlock" class="btn-primary" type="button">Unlock / Initialize Vault</button>
+          <button id="btn-vault-lock" class="btn-danger" type="button">Lock Vault Now</button>
+          <button id="btn-export-backup" class="btn-primary" type="button">Export Encrypted Backup</button>
+        </div>
+        <p id="vault-status" class="status"></p>
+      </section>
 
       <section class="card">
         <h2>Import Dashboard Vault Backup (.wafa.json)</h2>
@@ -24,18 +39,22 @@
           <input id="backup-file" type="file" accept=".json" />
         </div>
         <div class="field">
-          <label for="backup-passphrase">Decryption Passphrase (if encrypted)</label>
-          <input id="backup-passphrase" type="password" placeholder="Enter your backup passphrase" />
+          <label for="backup-passphrase">Backup Decryption Passphrase (if backup file is encrypted)</label>
+          <input id="backup-passphrase" type="password" placeholder="Enter backup passphrase" />
         </div>
-        <button id="btn-import" class="btn-primary" type="button">Decrypt &amp; Import into Extension Vault</button>
+        <button id="btn-import" class="btn-primary" type="button">Decrypt &amp; Save into Encrypted Extension Vault</button>
         <p id="import-status" class="status"></p>
       </section>
 
       <section class="card">
-        <h2>Preferences &amp; Permissions</h2>
+        <h2>Preferences, Auto-Lock &amp; Permissions</h2>
         <div class="field">
           <label for="dashboard-url">Management Dashboard URL</label>
           <input id="dashboard-url" type="url" placeholder="http://localhost:3000" />
+        </div>
+        <div class="field">
+          <label for="autolock-minutes">Vault Inactivity Auto-Lock (minutes)</label>
+          <input id="autolock-minutes" type="number" min="1" max="240" value="15" />
         </div>
         <label class="checkbox-row">
           <input id="chk-dgbpo" type="checkbox" checked />
@@ -50,11 +69,6 @@
           <button id="btn-clear-vault" class="btn-danger" type="button">Erase Extension Local Data</button>
         </div>
         <p id="settings-status" class="status"></p>
-      </section>
-
-      <section class="card">
-        <h2>Local Extension Vault Status</h2>
-        <p id="vault-summary" class="mono">Loading...</p>
       </section>
     </div>
 

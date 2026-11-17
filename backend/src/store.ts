@@ -2,50 +2,36 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {isPostgresConfigured} from '../../src/db/index.ts';
 import type {EncryptedEnvelope} from '../../shared/schemas/types';
+import {PostgresCloudStore} from './postgres-store';
+import type {
+  AtomicPushVaultResult,
+  AuditLogEntry,
+  CloudAccount,
+  CloudRepository,
+  CloudSession,
+  EncryptedCloudBackup,
+  EncryptedVaultState,
+  RateLimitResult,
+} from './repository';
 
-export interface CloudAccount {
-  id: string;
-  email: string;
-  passwordHash: string;
-  passwordSalt: string;
-  recoveryHint?: string;
-  createdAt: string;
-}
+export type {
+  AtomicPushVaultResult,
+  AuditLogEntry,
+  CloudAccount,
+  CloudRepository,
+  CloudSession,
+  EncryptedCloudBackup,
+  EncryptedVaultState,
+  RateLimitResult,
+};
 
-export interface CloudSession {
-  tokenHash: string;
-  accountId: string;
-  deviceLabel: string;
-  createdAt: string;
+interface RateLimitBucketRecord {
+  bucketKey: string;
+  requestCount: number;
+  windowStart: string;
   expiresAt: string;
-}
-
-export interface EncryptedVaultState {
-  accountId: string;
-  currentVersion: number;
-  envelope: EncryptedEnvelope;
-  lastIdempotencyKey: string;
-  updatedAt: string;
-}
-
-export interface EncryptedCloudBackup {
-  id: string;
-  accountId: string;
-  label: string;
-  schemaVersion: string;
-  byteSize: number;
-  envelope: EncryptedEnvelope;
-  createdAt: string;
-}
-
-export interface AuditLogEntry {
-  id: string;
-  accountId: string | null;
-  action: string;
-  status: 'ok' | 'rejected' | 'conflict' | 'error';
-  ipHash: string;
-  createdAt: string;
 }
 
 interface PersistedCloudDb {
@@ -53,6 +39,7 @@ interface PersistedCloudDb {
   sessions: CloudSession[];
   vaultStates: EncryptedVaultState[];
   backups: EncryptedCloudBackup[];
+  rateLimitBuckets: RateLimitBucketRecord[];
   auditLogs: AuditLogEntry[];
 }
 
@@ -61,22 +48,25 @@ const EMPTY_DB: PersistedCloudDb = {
   sessions: [],
   vaultStates: [],
   backups: [],
+  rateLimitBuckets: [],
   auditLogs: [],
 };
 
+const DEFAULT_SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MAX_CLOUD_BACKUPS_PER_ACCOUNT = 10;
+
 /**
- * Atomic file-backed repository mirroring the PostgreSQL schema (backend/migrations/001_initial_schema.sql)
- * so the optional cloud sync backend runs out-of-the-box inside AI Studio while keeping a clean
- * drop-in boundary for PostgreSQL in external server deployments.
+ * Atomic file-backed development/test repository mirroring the PostgreSQL schema.
+ * Production deployments with SQL_HOST/SQL_USER/SQL_PASSWORD/SQL_DB_NAME automatically
+ * use PostgresCloudStore via createCloudRepository().
  */
-export class CloudStore {
+export class CloudStore implements CloudRepository {
   private readonly filePath: string;
   private data: PersistedCloudDb;
 
   constructor(customPath?: string) {
     this.filePath =
-      customPath ||
-      path.join(os.tmpdir(), 'wafa-formassist-cloud-store.json');
+      customPath || path.join(os.tmpdir(), 'wafa-formassist-cloud-store.json');
     this.data = this.load();
   }
 
@@ -90,6 +80,7 @@ export class CloudStore {
           sessions: parsed.sessions || [],
           vaultStates: parsed.vaultStates || [],
           backups: parsed.backups || [],
+          rateLimitBuckets: parsed.rateLimitBuckets || [],
           auditLogs: parsed.auditLogs || [],
         };
       }
@@ -100,101 +91,231 @@ export class CloudStore {
   }
 
   private flush(): void {
-    const tmp = `${this.filePath}.tmp`;
+    const tmp = `${this.filePath}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf8');
     fs.renameSync(tmp, this.filePath);
   }
 
-  public findAccountByEmail(email: string): CloudAccount | undefined {
+  public async findAccountByEmail(email: string): Promise<CloudAccount | undefined> {
     const norm = email.trim().toLowerCase();
     return this.data.accounts.find((a) => a.email === norm);
   }
 
-  public findAccountById(id: string): CloudAccount | undefined {
+  public async findAccountById(id: string): Promise<CloudAccount | undefined> {
     return this.data.accounts.find((a) => a.id === id);
   }
 
-  public createAccount(params: {
+  public async findAccountByFirebaseUid(firebaseUid: string): Promise<CloudAccount | undefined> {
+    return this.data.accounts.find((a) => a.firebaseUid === firebaseUid);
+  }
+
+  public async createAccount(params: {
     email: string;
     passwordHash: string;
     passwordSalt: string;
     recoveryHint?: string;
-  }): CloudAccount {
+  }): Promise<CloudAccount> {
+    const now = new Date().toISOString();
     const account: CloudAccount = {
       id: crypto.randomUUID(),
+      firebaseUid: null,
       email: params.email.trim().toLowerCase(),
       passwordHash: params.passwordHash,
       passwordSalt: params.passwordSalt,
-      recoveryHint: params.recoveryHint,
-      createdAt: new Date().toISOString(),
+      recoveryHint: params.recoveryHint ?? null,
+      createdAt: now,
+      updatedAt: now,
     };
     this.data.accounts.push(account);
     this.flush();
     return account;
   }
 
-  public createSession(accountId: string, tokenHash: string, deviceLabel: string): CloudSession {
+  public async upsertFirebaseAccount(params: {
+    firebaseUid: string;
+    email: string;
+  }): Promise<CloudAccount> {
+    const normEmail = params.email.trim().toLowerCase();
+    const now = new Date().toISOString();
+
+    const byUid = this.data.accounts.find((a) => a.firebaseUid === params.firebaseUid);
+    if (byUid) {
+      byUid.email = normEmail;
+      byUid.updatedAt = now;
+      this.flush();
+      return byUid;
+    }
+
+    const byEmail = this.data.accounts.find((a) => a.email === normEmail);
+    if (byEmail) {
+      byEmail.firebaseUid = params.firebaseUid;
+      byEmail.updatedAt = now;
+      this.flush();
+      return byEmail;
+    }
+
+    const account: CloudAccount = {
+      id: crypto.randomUUID(),
+      firebaseUid: params.firebaseUid,
+      email: normEmail,
+      passwordHash: null,
+      passwordSalt: null,
+      recoveryHint: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.data.accounts.push(account);
+    this.flush();
+    return account;
+  }
+
+  public async createSession(params: {
+    accountId: string;
+    tokenHash: string;
+    csrfTokenHash: string;
+    deviceLabel: string;
+    ttlMs?: number;
+  }): Promise<CloudSession> {
     const now = Date.now();
     const session: CloudSession = {
-      tokenHash,
-      accountId,
-      deviceLabel: deviceLabel || 'Web Dashboard',
+      tokenHash: params.tokenHash,
+      accountId: params.accountId,
+      csrfTokenHash: params.csrfTokenHash,
+      deviceLabel: (params.deviceLabel || 'Web Dashboard').slice(0, 80),
       createdAt: new Date(now).toISOString(),
-      expiresAt: new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      lastActiveAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + (params.ttlMs ?? DEFAULT_SESSION_TTL_MS)).toISOString(),
+      revokedAt: null,
     };
     this.data.sessions.push(session);
     this.flush();
     return session;
   }
 
-  public findValidSession(tokenHash: string): CloudSession | undefined {
+  public async findValidSession(
+    tokenHash: string,
+    idleTimeoutMs: number,
+  ): Promise<CloudSession | undefined> {
+    const session = this.data.sessions.find((s) => s.tokenHash === tokenHash);
+    if (!session || session.revokedAt) return undefined;
+    const nowMs = Date.now();
+    if (new Date(session.expiresAt).getTime() <= nowMs) return undefined;
+    const lastActiveMs = new Date(session.lastActiveAt || session.createdAt).getTime();
+    if (nowMs - lastActiveMs > idleTimeoutMs) {
+      session.revokedAt = new Date(nowMs).toISOString();
+      this.flush();
+      return undefined;
+    }
+    return session;
+  }
+
+  public async touchSession(tokenHash: string): Promise<void> {
+    const session = this.data.sessions.find((s) => s.tokenHash === tokenHash && !s.revokedAt);
+    if (session) {
+      session.lastActiveAt = new Date().toISOString();
+      this.flush();
+    }
+  }
+
+  public async revokeSession(tokenHash: string): Promise<void> {
+    const session = this.data.sessions.find((s) => s.tokenHash === tokenHash);
+    if (session && !session.revokedAt) {
+      session.revokedAt = new Date().toISOString();
+      this.flush();
+    }
+  }
+
+  public async revokeAllUserSessions(accountId: string): Promise<void> {
     const now = new Date().toISOString();
-    return this.data.sessions.find((s) => s.tokenHash === tokenHash && s.expiresAt > now);
+    let changed = false;
+    for (const s of this.data.sessions) {
+      if (s.accountId === accountId && !s.revokedAt) {
+        s.revokedAt = now;
+        changed = true;
+      }
+    }
+    if (changed) this.flush();
   }
 
-  public deleteSession(tokenHash: string): void {
-    this.data.sessions = this.data.sessions.filter((s) => s.tokenHash !== tokenHash);
-    this.flush();
-  }
-
-  public getVaultState(accountId: string): EncryptedVaultState | undefined {
+  public async getVaultState(accountId: string): Promise<EncryptedVaultState | undefined> {
     return this.data.vaultStates.find((v) => v.accountId === accountId);
   }
 
-  public upsertVaultState(state: EncryptedVaultState): void {
-    const idx = this.data.vaultStates.findIndex((v) => v.accountId === state.accountId);
+  public async atomicPushVaultState(params: {
+    accountId: string;
+    baseVersion: number;
+    idempotencyKey: string;
+    envelope: EncryptedEnvelope;
+    forceResolve?: boolean;
+  }): Promise<AtomicPushVaultResult> {
+    const current = this.data.vaultStates.find((v) => v.accountId === params.accountId);
+    if (current && current.lastIdempotencyKey === params.idempotencyKey) {
+      return {
+        status: 'idempotent',
+        version: current.currentVersion,
+        updatedAt: current.updatedAt,
+      };
+    }
+
+    if (current && current.currentVersion > params.baseVersion && !params.forceResolve) {
+      return {
+        status: 'conflict',
+        remoteVersion: current.currentVersion,
+        remoteUpdatedAt: current.updatedAt,
+        remoteEnvelope: current.envelope,
+      };
+    }
+
+    const nextVersion = (current?.currentVersion || 0) + 1;
+    const updatedAt = new Date().toISOString();
+    const nextState: EncryptedVaultState = {
+      accountId: params.accountId,
+      currentVersion: nextVersion,
+      envelope: params.envelope,
+      lastIdempotencyKey: params.idempotencyKey,
+      updatedAt,
+    };
+
+    const idx = this.data.vaultStates.findIndex((v) => v.accountId === params.accountId);
     if (idx >= 0) {
-      this.data.vaultStates[idx] = state;
+      this.data.vaultStates[idx] = nextState;
     } else {
-      this.data.vaultStates.push(state);
+      this.data.vaultStates.push(nextState);
     }
     this.flush();
+    return {status: 'ok', version: nextVersion, updatedAt};
   }
 
-  public listBackups(accountId: string): EncryptedCloudBackup[] {
+  public async listBackups(accountId: string): Promise<EncryptedCloudBackup[]> {
     return this.data.backups
       .filter((b) => b.accountId === accountId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  public addBackup(backup: Omit<EncryptedCloudBackup, 'id' | 'createdAt'>): EncryptedCloudBackup {
+  public async addBackup(backup: {
+    accountId: string;
+    label: string;
+    schemaVersion: string;
+    integrityHash: string;
+    byteSize: number;
+    envelope: EncryptedEnvelope;
+  }): Promise<EncryptedCloudBackup> {
     const entry: EncryptedCloudBackup = {
       ...backup,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
     };
     this.data.backups.push(entry);
-    // Apply minimum cloud retention: retain most recent 10 encrypted backups per account
-    const userBackups = this.listBackups(backup.accountId);
-    if (userBackups.length > 10) {
-      const toRemove = new Set(userBackups.slice(10).map((b) => b.id));
+    const userBackups = await this.listBackups(backup.accountId);
+    if (userBackups.length > MAX_CLOUD_BACKUPS_PER_ACCOUNT) {
+      const toRemove = new Set(userBackups.slice(MAX_CLOUD_BACKUPS_PER_ACCOUNT).map((b) => b.id));
       this.data.backups = this.data.backups.filter((b) => !toRemove.has(b.id));
     }
     this.flush();
     return entry;
   }
 
-  public deleteBackup(accountId: string, backupId: string): boolean {
+  public async deleteBackup(accountId: string, backupId: string): Promise<boolean> {
     const before = this.data.backups.length;
     this.data.backups = this.data.backups.filter(
       (b) => !(b.accountId === accountId && b.id === backupId),
@@ -204,7 +325,7 @@ export class CloudStore {
     return changed;
   }
 
-  public deleteAccountAndAllCloudData(accountId: string): void {
+  public async deleteAccountAndAllCloudData(accountId: string): Promise<void> {
     this.data.accounts = this.data.accounts.filter((a) => a.id !== accountId);
     this.data.sessions = this.data.sessions.filter((s) => s.accountId !== accountId);
     this.data.vaultStates = this.data.vaultStates.filter((v) => v.accountId !== accountId);
@@ -212,7 +333,60 @@ export class CloudStore {
     this.flush();
   }
 
-  public recordAudit(entry: Omit<AuditLogEntry, 'id' | 'createdAt'>): void {
+  public async consumeRateLimit(params: {
+    bucketKey: string;
+    windowMs: number;
+    maxRequests: number;
+  }): Promise<RateLimitResult> {
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const nextExpiryIso = new Date(nowMs + params.windowMs).toISOString();
+
+    let bucket = this.data.rateLimitBuckets.find((b) => b.bucketKey === params.bucketKey);
+    if (!bucket || new Date(bucket.expiresAt).getTime() <= nowMs) {
+      if (bucket) {
+        bucket.requestCount = 1;
+        bucket.windowStart = nowIso;
+        bucket.expiresAt = nextExpiryIso;
+      } else {
+        bucket = {
+          bucketKey: params.bucketKey,
+          requestCount: 1,
+          windowStart: nowIso,
+          expiresAt: nextExpiryIso,
+        };
+        this.data.rateLimitBuckets.push(bucket);
+      }
+      // Trim expired buckets
+      this.data.rateLimitBuckets = this.data.rateLimitBuckets.filter(
+        (b) => new Date(b.expiresAt).getTime() > nowMs,
+      );
+      this.flush();
+      return {
+        allowed: true,
+        remaining: Math.max(0, params.maxRequests - 1),
+        resetAt: nextExpiryIso,
+      };
+    }
+
+    if (bucket.requestCount >= params.maxRequests) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt: bucket.expiresAt,
+      };
+    }
+
+    bucket.requestCount += 1;
+    this.flush();
+    return {
+      allowed: true,
+      remaining: Math.max(0, params.maxRequests - bucket.requestCount),
+      resetAt: bucket.expiresAt,
+    };
+  }
+
+  public async recordAudit(entry: Omit<AuditLogEntry, 'id' | 'createdAt'>): Promise<void> {
     this.data.auditLogs.push({
       ...entry,
       id: crypto.randomUUID(),
@@ -223,4 +397,13 @@ export class CloudStore {
     }
     this.flush();
   }
+}
+
+export const JsonDevCloudStore = CloudStore;
+
+export function createCloudRepository(): CloudRepository {
+  if (isPostgresConfigured()) {
+    return new PostgresCloudStore();
+  }
+  return new CloudStore();
 }

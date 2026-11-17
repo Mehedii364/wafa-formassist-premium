@@ -1,21 +1,69 @@
 import React, {forwardRef, useImperativeHandle, useRef, useState} from 'react';
 import {BD_DISTRICTS, findDistrictEntry} from '../../shared/constants/bd-locations';
 import {DetectedFormField, FieldMappingResult} from '../../shared/schemas/types';
+import {classifySensitiveField} from '../../shared/security/sensitive-fields';
 
 export interface SimulatedFormHandle {
-  scanDomFields: () => DetectedFormField[];
+  scanDomFields: () => {
+    fields: DetectedFormField[];
+    protectedSkippedCount: number;
+  };
   applyApprovedMappings: (approved: FieldMappingResult[]) => {
     filledCount: number;
+    skippedCount: number;
     failedCount: number;
-    details: Array<{elementKey: string; fieldLabel: string; ok: boolean; reason?: string}>;
+    details: Array<{
+      elementKey: string;
+      fieldLabel: string;
+      ok: boolean;
+      skipped?: boolean;
+      reason?: string;
+    }>;
   };
   resetForm: () => void;
 }
 
+function setNativeControlValue(
+  el: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  value: string,
+): void {
+  const proto =
+    el instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : el instanceof HTMLSelectElement
+        ? HTMLSelectElement.prototype
+        : HTMLInputElement.prototype;
+  const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
+  if (descriptor && typeof descriptor.set === 'function') {
+    descriptor.set.call(el, value);
+  } else {
+    el.value = value;
+  }
+}
+
+function setNativeCheckboxChecked(el: HTMLInputElement, checked: boolean): void {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked');
+  if (descriptor && typeof descriptor.set === 'function') {
+    descriptor.set.call(el, checked);
+  } else {
+    el.checked = checked;
+  }
+}
+
+function resolveDescribedByText(form: HTMLFormElement, el: HTMLElement): string {
+  const ids = (el.getAttribute('aria-describedby') || '').trim().split(/\s+/).filter(Boolean);
+  if (!ids.length) return '';
+  return ids
+    .map((id) => form.querySelector(`#${CSS.escape(id)}`)?.textContent?.trim() || '')
+    .filter(Boolean)
+    .join(' ');
+}
+
 /**
- * Real DOM-backed simulated Bangladesh Post Office DGBPO 2026 Checker [চেকার] form.
+ * Real DOM-backed simulated Bangladesh Post Office DGBPO 2026 application form.
  * Every input, select, checkbox, and textarea is scanned directly from the live DOM,
- * filled via real native value updates + input/change events, and verified post-fill.
+ * sensitive fields are independently excluded before capture or write, existing manual
+ * values are preserved unless explicitly approved for overwrite, and values are verified post-fill.
  */
 export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) => {
   const formRef = useRef<HTMLFormElement>(null);
@@ -29,11 +77,12 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
   useImperativeHandle(ref, () => ({
     scanDomFields: () => {
       const form = formRef.current;
-      if (!form) return [];
+      if (!form) return {fields: [], protectedSkippedCount: 0};
       const controls = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
         'input, select, textarea',
       );
       const detected: DetectedFormField[] = [];
+      let protectedSkippedCount = 0;
       let idx = 0;
 
       for (const el of controls) {
@@ -41,12 +90,43 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
         const inputType = tagName === 'input' ? (el.type || 'text').toLowerCase() : tagName;
         if (['hidden', 'submit', 'button', 'reset'].includes(inputType)) continue;
 
+        const labelEl = el.id ? form.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
+        const labelText = (labelEl?.textContent || el.getAttribute('aria-label') || el.name || '')
+          .replace(/\s*\*\s*$/, '')
+          .trim();
+        const autocomplete = el.getAttribute('autocomplete') || '';
+        const describedBy = resolveDescribedByText(form, el);
+        const placeholder = el.getAttribute('placeholder') || '';
+        const ariaLabel = el.getAttribute('aria-label') || '';
+
+        // Independent sensitive-field exclusion BEFORE ever reading el.value
+        const sensitiveDecision = classifySensitiveField({
+          tagName,
+          inputType,
+          autocomplete,
+          name: el.name || '',
+          id: el.id || '',
+          label: labelText,
+          placeholder,
+          ariaLabel,
+          describedBy,
+        });
+        if (sensitiveDecision.sensitive) {
+          protectedSkippedCount += 1;
+          continue;
+        }
+
         idx += 1;
         const key = el.getAttribute('data-wafa-key') || `sim-field-${idx}`;
         el.setAttribute('data-wafa-key', key);
-
-        const labelEl = el.id ? form.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
         const sectionEl = el.closest('[data-wafa-section]');
+
+        const currentValue =
+          inputType === 'checkbox'
+            ? String((el as HTMLInputElement).checked)
+            : String(el.value || '');
+        const hasExistingValue =
+          inputType === 'checkbox' ? (el as HTMLInputElement).checked : Boolean(currentValue.trim());
 
         const item: DetectedFormField = {
           elementKey: key,
@@ -54,16 +134,16 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
           inputType,
           name: el.name || '',
           id: el.id || '',
-          label: (labelEl?.textContent || el.getAttribute('aria-label') || el.name || '').replace(/\s*\*\s*$/, '').trim(),
-          placeholder: el.getAttribute('placeholder') || '',
-          ariaLabel: el.getAttribute('aria-label') || '',
-          description: el.getAttribute('title') || '',
+          label: labelText,
+          placeholder,
+          ariaLabel,
+          autocomplete,
+          describedBy,
+          description: el.getAttribute('title') || describedBy,
           sectionHint: sectionEl?.getAttribute('data-wafa-section') || 'basic',
           required: Boolean(el.required),
-          currentValue:
-            inputType === 'checkbox'
-              ? String((el as HTMLInputElement).checked)
-              : String(el.value || ''),
+          hasExistingValue,
+          currentValue,
         };
 
         if (tagName === 'select') {
@@ -74,15 +154,22 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
         }
         detected.push(item);
       }
-      return detected;
+      return {fields: detected, protectedSkippedCount};
     },
 
     applyApprovedMappings: (approved) => {
       const form = formRef.current;
-      if (!form) return {filledCount: 0, failedCount: approved.length, details: []};
+      if (!form) return {filledCount: 0, skippedCount: 0, failedCount: approved.length, details: []};
       let filledCount = 0;
+      let skippedCount = 0;
       let failedCount = 0;
-      const details: Array<{elementKey: string; fieldLabel: string; ok: boolean; reason?: string}> = [];
+      const details: Array<{
+        elementKey: string;
+        fieldLabel: string;
+        ok: boolean;
+        skipped?: boolean;
+        reason?: string;
+      }> = [];
 
       for (const m of approved) {
         const el = form.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
@@ -95,29 +182,74 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
         }
         const tag = el.tagName.toLowerCase();
         const type = tag === 'input' ? (el as HTMLInputElement).type.toLowerCase() : tag;
-        if (type === 'file' || type === 'password') {
+        const labelEl = el.id ? form.querySelector(`label[for="${CSS.escape(el.id)}"]`) : null;
+
+        // Independent sensitive-field exclusion at write time
+        const sensitiveDecision = classifySensitiveField({
+          tagName: tag,
+          inputType: type,
+          autocomplete: el.getAttribute('autocomplete') || '',
+          name: el.name || '',
+          id: el.id || '',
+          label: labelEl?.textContent || m.fieldLabel,
+          placeholder: el.getAttribute('placeholder') || '',
+          ariaLabel: el.getAttribute('aria-label') || '',
+        });
+        if (sensitiveDecision.sensitive) {
           failedCount += 1;
-          details.push({elementKey: m.elementKey, fieldLabel: m.fieldLabel, ok: false, reason: 'Security excluded'});
+          details.push({
+            elementKey: m.elementKey,
+            fieldLabel: m.fieldLabel,
+            ok: false,
+            reason: `Protected field (${sensitiveDecision.category})`,
+          });
           continue;
         }
 
         if (type === 'checkbox') {
           const desired = m.transformedValue === 'true';
-          (el as HTMLInputElement).checked = desired;
+          const currentChecked = (el as HTMLInputElement).checked;
+          if (currentChecked && currentChecked !== desired && !m.allowOverwrite) {
+            skippedCount += 1;
+            details.push({
+              elementKey: m.elementKey,
+              fieldLabel: m.fieldLabel,
+              ok: true,
+              skipped: true,
+              reason: 'Existing checked state preserved',
+            });
+            continue;
+          }
+          setNativeCheckboxChecked(el as HTMLInputElement, desired);
           if (el.id === 'sim_same_as_present') setSameAsPresent(desired);
           el.dispatchEvent(new Event('change', {bubbles: true}));
           const ok = (el as HTMLInputElement).checked === desired;
-          ok ? (filledCount += 1) : (failedCount += 1);
+          if (ok) filledCount += 1;
+          else failedCount += 1;
           details.push({elementKey: m.elementKey, fieldLabel: m.fieldLabel, ok});
         } else {
+          const existingVal = String(el.value || '').trim();
+          if (existingVal && existingVal !== m.transformedValue.trim() && !m.allowOverwrite) {
+            skippedCount += 1;
+            details.push({
+              elementKey: m.elementKey,
+              fieldLabel: m.fieldLabel,
+              ok: true,
+              skipped: true,
+              reason: 'Existing user value preserved (overwrite not approved)',
+            });
+            continue;
+          }
+
           if (el.id === 'sim_present_district') setPresentDistrict(m.transformedValue);
           if (el.id === 'sim_permanent_district') setPermanentDistrict(m.transformedValue);
 
-          el.value = m.transformedValue;
+          setNativeControlValue(el, m.transformedValue);
           el.dispatchEvent(new Event('input', {bubbles: true}));
           el.dispatchEvent(new Event('change', {bubbles: true}));
           const ok = el.value === m.transformedValue;
-          ok ? (filledCount += 1) : (failedCount += 1);
+          if (ok) filledCount += 1;
+          else failedCount += 1;
           details.push({
             elementKey: m.elementKey,
             fieldLabel: m.fieldLabel,
@@ -127,7 +259,7 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
         }
       }
 
-      return {filledCount, failedCount, details};
+      return {filledCount, skippedCount, failedCount, details};
     },
 
     resetForm: () => {
@@ -155,7 +287,7 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
         className="rounded-lg border border-[#D7E2DC] dark:border-[#26362F] p-4"
       >
         <legend className="px-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-          Basic Information · মৌলিক তথ্য (Post: Checker [চেকার])
+          Basic Information · মৌলিক তথ্য
         </legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-1">
           <div>
@@ -537,15 +669,19 @@ export const SimulatedDgbpoForm = forwardRef<SimulatedFormHandle>((_props, ref) 
         </fieldset>
       </div>
 
-      {/* Security Protected Fields (Proves exclusion works) */}
+      {/* Security Protected Fields (Proves independent exclusion works) */}
       <fieldset data-wafa-section="security" className="rounded-lg border border-amber-500/30 p-4">
         <legend className="px-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
           Security Verification (Excluded from Autofill)
         </legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
           <div>
             <label htmlFor="sim_captcha" className={lblCls}>Validation Code (CAPTCHA)</label>
             <input id="sim_captcha" name="captcha_code" type="text" placeholder="Manual entry only" className={inputCls} />
+          </div>
+          <div>
+            <label htmlFor="sim_otp" className={lblCls}>OTP Verification Code</label>
+            <input id="sim_otp" name="otp_code" type="text" autoComplete="one-time-code" placeholder="Manual OTP only" className={inputCls} />
           </div>
           <div>
             <label htmlFor="sim_photo" className={lblCls}>Applicant Photo Upload</label>
